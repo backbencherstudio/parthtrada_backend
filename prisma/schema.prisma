@@ -13,3 +13,64 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model User {
+  id           String   @id @default(cuid())
+  linkedInId   String   @unique
+
+  name         String?
+  email        String?  @unique //for admin
+  password     String?          //for admin
+
+  role         Role     @default(STUDENT)
+
+  studentProfile StudentProfile?
+  expertProfile  ExpertProfile?
+  ucode          Ucode[]
+
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
+
+model Ucode {
+  id           String    @id @default(cuid())
+  accessToken  String? //Linkedin access token
+  refreshToken String? //Linkedin refresh token
+
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  userId       String    @unique
+  user         User      @relation(fields: [userId], references: [id])
+}
+
+model StudentProfile {
+  id          String    @id @default(cuid())
+  
+  name        String
+  profession  String
+  location    String
+  description String?
+
+  userId      String   @unique
+  user        User     @relation(fields: [userId], references: [id])
+}
+
+model ExpertProfile {
+  id           String   @id @default(cuid())
+  name         String
+  profession   String
+  location     String
+  organization String
+  skills       String[]
+  description  String?
+  hourlyRate   Float
+
+  userId       String   @unique
+  user         User     @relation(fields: [userId], references: [id])
+}
+
+enum Role {
+  STUDENT
+  EXPART
+  ADMIN
+}
