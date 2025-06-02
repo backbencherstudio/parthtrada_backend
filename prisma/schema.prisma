@@ -20,12 +20,15 @@ model User {
   name         String?
   email        String?  @unique //for admin
   password     String?          //for admin
-
+  lastLogin    DateTime?
   role         Role     @default(STUDENT)
 
   studentProfile StudentProfile?
   expertProfile  ExpertProfile?
   ucode          Ucode[]
+
+  studentBookings  Booking[]        @relation("StudentBookings")
+  expertBookings   Booking[]        @relation("ExpertBookings")
 
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
@@ -40,7 +43,7 @@ model Ucode {
   updatedAt    DateTime  @updatedAt
 
   userId       String    @unique
-  user         User      @relation(fields: [userId], references: [id])
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model StudentProfile {
@@ -52,7 +55,7 @@ model StudentProfile {
   description  String?
 
   userId       String   @unique
-  user         User     @relation(fields: [userId], references: [id])
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model ExpertProfile {
@@ -69,11 +72,64 @@ model ExpertProfile {
   availableTime String[]
 
   userId       String   @unique
-  user         User     @relation(fields: [userId], references: [id])
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+
+
+model Booking {
+  id               String           @id @default(cuid())
+  studentId        String?
+  expertId         String?
+  date             DateTime
+  time             String
+  sessionDetails   Json
+  sessionDuration  Int
+  status           BookingStatus    @default(UPCOMING)
+
+  student          User?            @relation("StudentBookings", fields: [studentId], references: [id], onDelete: SetNull)
+  expert           User?            @relation("ExpertBookings", fields: [expertId], references: [id], onDelete: SetNull)
+  transaction      Transaction?
+
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+}
+
+model Transaction {
+  id             String           @id @default(cuid())
+  bookingId      String           @unique
+  amount         Float
+  currency       String
+  provider       PaymentProvider
+  providerId     String           // Stripe/Paypal transaction id
+  status         TransactionStatus
+
+  booking        Booking          @relation(fields: [bookingId], references: [id])
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+}
+
+enum BookingStatus {
+  UPCOMING
+  MISSED
+  COMPLETED
+  REFUNDED
+}
+
+enum PaymentProvider {
+  STRIPE
+  PAYPAL
+}
+
+enum TransactionStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  REFUNDED
 }
 
 enum Role {
   STUDENT
-  EXPART
+  EXPERT 
   ADMIN
 }
