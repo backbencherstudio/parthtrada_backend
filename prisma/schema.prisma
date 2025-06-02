@@ -33,8 +33,8 @@ model User {
 
 model Ucode {
   id           String    @id @default(cuid())
-  accessToken  String? //Linkedin access token
-  refreshToken String? //Linkedin refresh token
+  accessToken  String?   //Linkedin access token
+  refreshToken String?   //Linkedin refresh token
 
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
@@ -44,26 +44,29 @@ model Ucode {
 }
 
 model StudentProfile {
-  id          String    @id @default(cuid())
-  
-  name        String
-  profession  String
-  location    String
-  description String?
+  id           String    @id @default(cuid())
 
-  userId      String   @unique
-  user        User     @relation(fields: [userId], references: [id])
+  profession   String?
+  organization String?
+  location     String?
+  description  String?
+
+  userId       String   @unique
+  user         User     @relation(fields: [userId], references: [id])
 }
 
 model ExpertProfile {
-  id           String   @id @default(cuid())
-  name         String
-  profession   String
-  location     String
-  organization String
-  skills       String[]
-  description  String?
-  hourlyRate   Float
+  id            String   @id @default(cuid())
+ 
+  profession    String?
+  organization  String?
+  location      String?
+  description   String?
+  experience    String?
+  hourlyRate    String?
+  skills        String[]
+  availableDays String[]
+  availableTime String[]
 
   userId       String   @unique
   user         User     @relation(fields: [userId], references: [id])
