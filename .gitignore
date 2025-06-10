@@ -2,8 +2,7 @@
 .env
 .env.local
 .env.*.local
-/prisma/generated/
-/prisma/migrations/
+
 /prisma/dev.db
 logs
 *.log
