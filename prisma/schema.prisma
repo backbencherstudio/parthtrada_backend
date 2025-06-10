@@ -14,53 +14,57 @@ datasource db {
 }
 
 model User {
-  id           String   @id @default(cuid())
-  linkedInId   String   @unique
+  id         String @id @default(cuid())
+  linkedInId String @unique
 
-  name         String?
-  email        String?  @unique //for admin
-  password     String?          //for admin
-  lastLogin    DateTime?
-  role         Role     @default(STUDENT)
+  name      String?
+  email     String?   @unique //for admin
+  password  String? //for admin
+  lastLogin DateTime?
+  role      Role      @default(STUDENT)
 
   studentProfile StudentProfile?
   expertProfile  ExpertProfile?
   ucode          Ucode[]
 
-  studentBookings  Booking[]        @relation("StudentBookings")
-  expertBookings   Booking[]        @relation("ExpertBookings")
+  studentBookings Booking[] @relation("StudentBookings")
+  expertBookings  Booking[] @relation("ExpertBookings")
 
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  studentReviews Review[]       @relation("StudentReview")
+  expertReviews  Review[]       @relation("ExpertReview")
+  notifications  Notification[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Ucode {
-  id           String    @id @default(cuid())
-  accessToken  String?   //Linkedin access token
-  refreshToken String?   //Linkedin refresh token
+  id           String  @id @default(cuid())
+  accessToken  String? //Linkedin access token
+  refreshToken String? //Linkedin refresh token
 
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  userId       String    @unique
-  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model StudentProfile {
-  id           String    @id @default(cuid())
+  id String @id @default(cuid())
 
   profession   String?
   organization String?
   location     String?
   description  String?
 
-  userId       String   @unique
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model ExpertProfile {
-  id            String   @id @default(cuid()) 
- 
+  id String @id @default(cuid())
+
   profession    String?
   organization  String?
   location      String?
@@ -71,48 +75,76 @@ model ExpertProfile {
   availableDays String[]
   availableTime String[]
 
-  userId       String   @unique
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
-
-
 model Booking {
-  id               String           @id @default(cuid())
-  studentId        String?
-  expertId         String?
-  date             DateTime
-  time             String
-  meetingLink      String?
-  sessionDetails   Json
-  sessionDuration  Int
-  status           BookingStatus    @default(UPCOMING)
+  id              String        @id @default(cuid())
+  studentId       String?
+  expertId        String?
+  date            DateTime
+  time            String
+  meetingLink     String?
+  sessionDetails  Json
+  sessionDuration Int
+  status          BookingStatus @default(UPCOMING)
 
-  student          User?            @relation("StudentBookings", fields: [studentId], references: [id], onDelete: SetNull)
-  expert           User?            @relation("ExpertBookings", fields: [expertId], references: [id], onDelete: SetNull)
-  transaction      Transaction?
-
-  createdAt        DateTime         @default(now())
-  updatedAt        DateTime         @updatedAt
+  student     User?        @relation("StudentBookings", fields: [studentId], references: [id], onDelete: SetNull)
+  expert      User?        @relation("ExpertBookings", fields: [expertId], references: [id], onDelete: SetNull)
+  transaction Transaction?
+  review      Review?
+  
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
 }
 
 model Transaction {
-  id             String           @id @default(cuid())
-  bookingId      String           @unique
-  amount         Float
-  currency       String
-  provider       PaymentProvider
-  providerId     String           // Stripe/Paypal transaction id
-  status         TransactionStatus
+  id         String            @id @default(cuid())
+  bookingId  String            @unique
+  amount     Float
+  currency   String
+  provider   PaymentProvider
+  providerId String
+  status     TransactionStatus
 
-  refundDate     DateTime?
-  refundReason   String?
+  refundDate   DateTime?
+  refundReason String?
 
-  booking        Booking          @relation(fields: [bookingId], references: [id])
-  createdAt      DateTime         @default(now())
-  updatedAt      DateTime         @updatedAt
+  booking   Booking  @relation(fields: [bookingId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
+model Review {
+  id          String  @id @default(cuid())
+  rating      Int
+  description String?
+
+  bookingId String @unique
+  studentId String
+  expertId  String
+
+  booking Booking @relation(fields: [bookingId], references: [id])
+  student User    @relation("StudentReview", fields: [studentId], references: [id])
+  expert  User    @relation("ExpertReview", fields: [expertId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Notification {
+  id      String           @id @default(cuid())
+  title   String
+  message String
+  type    NotificationType
+  isRead  Boolean          @default(false)
+
+  recipientId String
+  recipient   User   @relation(fields: [recipientId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+}
 
 enum BookingStatus {
   UPCOMING
@@ -135,6 +167,16 @@ enum TransactionStatus {
 
 enum Role {
   STUDENT
-  EXPERT 
+  EXPERT
   ADMIN
+}
+
+enum NotificationType {
+  BOOKING_CONFIRMED
+  BOOKING_CANCELLED
+  PAYMENT_SUCCESS
+  PAYMENT_FAILED
+  SESSION_COMPLETED
+  REVIEW_RECEIVED
+  SYSTEM_ALERT
 }
