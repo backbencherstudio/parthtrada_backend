@@ -94,14 +94,14 @@ model Booking {
   expert      User?        @relation("ExpertBookings", fields: [expertId], references: [id], onDelete: SetNull)
   transaction Transaction?
   review      Review?
-  
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Transaction {
   id         String            @id @default(cuid())
-  bookingId  String            @unique
+  bookingId  String?           @unique
   amount     Float
   currency   String
   provider   PaymentProvider
@@ -111,7 +111,7 @@ model Transaction {
   refundDate   DateTime?
   refundReason String?
 
-  booking   Booking  @relation(fields: [bookingId], references: [id])
+  booking   Booking? @relation(fields: [bookingId], references: [id], onDelete: SetNull)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -121,17 +121,22 @@ model Review {
   rating      Int
   description String?
 
-  bookingId String @unique
-  studentId String
-  expertId  String
+  bookingId   String?   @unique
+  booking     Booking?  @relation(fields: [bookingId], references: [id], onDelete: SetNull)
 
-  booking Booking @relation(fields: [bookingId], references: [id])
-  student User    @relation("StudentReview", fields: [studentId], references: [id])
-  expert  User    @relation("ExpertReview", fields: [expertId], references: [id])
+  studentId   String
+  expertId    String 
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  student     User       @relation("StudentReview", fields: [studentId], references: [id])
+  expert      User       @relation("ExpertReview", fields: [expertId], references: [id])
+
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
 }
+
+
+
+
 
 model Notification {
   id      String           @id @default(cuid())
@@ -180,3 +185,5 @@ enum NotificationType {
   REVIEW_RECEIVED
   SYSTEM_ALERT
 }
+
+
