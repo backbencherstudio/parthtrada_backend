@@ -1,7 +1,9 @@
+
+
 {
   // Most ts-node options can be specified here using their programmatic names.
   "ts-node": {
-    "swc": true,
+    // "swc": true,
     // It is faster to skip typechecking.
     // Remove if you want ts-node to do typechecking.
     // "transpileOnly": true,
