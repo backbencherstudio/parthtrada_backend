@@ -59,7 +59,7 @@ model StudentProfile {
 }
 
 model ExpertProfile {
-  id            String   @id @default(cuid())
+  id            String   @id @default(cuid()) 
  
   profession    String?
   organization  String?
@@ -83,6 +83,7 @@ model Booking {
   expertId         String?
   date             DateTime
   time             String
+  meetingLink      String?
   sessionDetails   Json
   sessionDuration  Int
   status           BookingStatus    @default(UPCOMING)
@@ -104,10 +105,14 @@ model Transaction {
   providerId     String           // Stripe/Paypal transaction id
   status         TransactionStatus
 
+  refundDate     DateTime?
+  refundReason   String?
+
   booking        Booking          @relation(fields: [bookingId], references: [id])
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt
 }
+
 
 enum BookingStatus {
   UPCOMING
