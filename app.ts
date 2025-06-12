@@ -1,7 +1,7 @@
 import express, { Request, Response, NextFunction } from "express";
 import cors from "cors";
 import morgan from "morgan";
-
+import authRoutes from './models/auth/auth.routes';
 import path from "path";
 
 const app = express();
@@ -15,6 +15,8 @@ app.use(
       "http://localhost:3001",
       "http://localhost:3002",
       "http://localhost:3003",
+      "http://localhost:5174",
+      "http://localhost:5173"
     ],
   })
 );
@@ -23,6 +25,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(morgan("dev"));
 
+app.use('/auth', authRoutes);
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 app.use((req: Request, res: Response, next: NextFunction) => {
