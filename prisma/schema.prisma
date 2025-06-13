@@ -17,7 +17,6 @@ model User {
   id         String @id @default(cuid())
   linkedInId String @unique
 
-  sub       String?  //for linkedin identifier
   name      String?
   email     String?   @unique //for admin
   password  String? //for admin

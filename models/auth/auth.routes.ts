@@ -1,10 +1,12 @@
 import { Router } from 'express';
-import { linkedinCallback } from './auth.controllers';
+import { linkedinCallback, updateUser } from './auth.controllers';
+import { verifyUser } from '../../middleware/verifyUsers';
 
 const router = Router();
 
-// LinkedIn OAuth routes
+
 router.get('/linkedin/callback', linkedinCallback);
 
+router.put('/update', verifyUser('ANY'), updateUser);
 
 export default router;
