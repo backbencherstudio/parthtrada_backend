@@ -1,4 +1,3 @@
-
 import { Request, Response } from "express";
 
 const LINKEDIN_CONFIG = {
@@ -60,6 +59,7 @@ export const linkedinCallback = async (req: Request, res: Response) => {
 
     const tokenData = await fetchAccessToken(code);
     const userInfo = await fetchUserInfo(tokenData.access_token);
+   
 
    res.json({
       message: "Authentication successful",
@@ -80,3 +80,33 @@ export const linkedinCallback = async (req: Request, res: Response) => {
     });
   }
 };
+
+
+
+
+
+
+
+
+// import React from "react";
+
+// const Login = () => {
+//   const handleLogin = () => {
+//     const params = new URLSearchParams({
+//       response_type: "code",
+//       client_id: "785hgn6asywpg6",
+//       redirect_uri: "http://192.168.4.3:8000/auth/linkedin/callback",
+//       scope: "openid email profile",
+//     });
+//     window.location.href = `https://www.linkedin.com/oauth/v2/authorization?${params.toString()}`;
+//   };
+//   return (
+//     <div>
+//       <h1>Linkdin Login</h1>
+
+//       <button onClick={handleLogin}>Signin with Linkdin</button>
+//     </div>
+//   );
+// };
+
+// export default Login;

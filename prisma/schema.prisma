@@ -21,6 +21,7 @@ model User {
   email     String?   @unique //for admin
   password  String? //for admin
   lastLogin DateTime?
+  image     String?
   activeProfile Role @default(STUDENT)
 
   studentProfile StudentProfile?
