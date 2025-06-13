@@ -3,6 +3,10 @@ import { PrismaClient } from "@prisma/client";
 import jwt from "jsonwebtoken";
 import dotenv from "dotenv";
 import { AuthenticatedRequest } from "../../middleware/verifyUsers";
+import fs from "fs";
+import path from "path";
+import { v4 as uuidv4 } from "uuid";
+import { baseUrl, getImageUrl } from "../../utils/base_utl";
 
 dotenv.config();
 
@@ -38,8 +42,7 @@ const fetchAccessToken = async (code: string) => {
 };
 
 const fetchUserInfo = async (accessToken: string) => {
-
-  console.log(LINKEDIN_CONFIG)
+  console.log(LINKEDIN_CONFIG);
   const response = await fetch(LINKEDIN_CONFIG.userInfoEndpoint, {
     headers: {
       Authorization: `Bearer ${accessToken}`,
@@ -54,56 +57,77 @@ const fetchUserInfo = async (accessToken: string) => {
   return await response.json();
 };
 
+const downloadAndSaveImage = async (imageUrl: string): Promise<string> => {
+  try {
+    const response = await fetch(imageUrl);
+    if (!response.ok) throw new Error("Failed to download image");
+
+    const buffer = await response.arrayBuffer();
+    const filename = `${uuidv4()}.jpg`;
+    const filepath = path.join(__dirname, "../../uploads", filename);
+
+    fs.writeFileSync(filepath, Buffer.from(buffer));
+    return filename;
+  } catch (error) {
+    console.error("Error saving image:", error);
+    return imageUrl;
+  }
+};
+
 
 export const linkedinCallback = async (req: Request, res: Response) => {
   try {
     const { code } = req.query;
-    
+
     if (!code || typeof code !== "string") {
-       res.status(400).json({ message: "Authorization code is required" });
-       return
+      res.status(400).json({ message: "Authorization code is required" });
+      return;
     }
 
     const tokenData = await fetchAccessToken(code);
     const userInfo = await fetchUserInfo(tokenData.access_token);
-    
+    console.log(userInfo);
+
+    // Download and save the profile picture
+
     let user = await prisma.user.findFirst({
       where: {
         linkedInId: userInfo.sub,
       },
       include: {
         studentProfile: true,
-        expertProfile: true
-      }
+        expertProfile: true,
+      },
     });
 
     // If user not found, create one
     if (!user) {
+      const savedImagePath = await downloadAndSaveImage(userInfo.picture);
+
       user = await prisma.user.create({
         data: {
           linkedInId: userInfo.sub,
           name: userInfo.name,
           email: userInfo.email,
-          image: userInfo.picture,
-          lastLogin: new Date()
+          image: savedImagePath || userInfo.picture,
+          lastLogin: new Date(),
         },
         include: {
           studentProfile: true,
-          expertProfile: true
-        }
+          expertProfile: true,
+        },
       });
     }
-
 
     const token = jwt.sign(
       {
         id: user.id,
         email: user.email,
         name: user.name,
-        activeProfile: user.activeProfile
+        activeProfile: user.activeProfile,
       },
       process.env.JWT_SECRET as string,
-      { expiresIn: '7d' }
+      { expiresIn: "7d" }
     );
 
     // Prepare response data based on activeProfile
@@ -111,51 +135,65 @@ export const linkedinCallback = async (req: Request, res: Response) => {
       id: user.id,
       name: user.name,
       email: user.email,
-      image: user.image,
+      image: getImageUrl(`/uploads/${user.image}`),
       activeProfile: user.activeProfile,
-      profile: user.activeProfile === 'STUDENT' 
-        ? user.studentProfile 
-        : user.expertProfile
+      profile:
+        user.activeProfile === "STUDENT"
+          ? user.studentProfile
+          : user.expertProfile,
     };
 
     res.json({
       message: "Authentication successful",
       token,
-      user: responseData
+      user: responseData,
     });
-
   } catch (error) {
     console.error("Authentication error:", error);
-    
-    const statusCode = error instanceof Error && error.message.includes("status:") ? 502 : 500;
-    const errorMessage = error instanceof Error ? error.message : "Internal server error";
 
-    res.status(statusCode).json({ 
-      message: "Authentication failed", 
-      error: errorMessage 
+    const statusCode =
+      error instanceof Error && error.message.includes("status:") ? 502 : 500;
+    const errorMessage =
+      error instanceof Error ? error.message : "Internal server error";
+
+    res.status(statusCode).json({
+      message: "Authentication failed",
+      error: errorMessage,
     });
   }
 };
 
-export const updateUser = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+export const updateUser = async (
+  req: AuthenticatedRequest,
+  res: Response
+): Promise<void> => {
   try {
     const userId = req.user?.id;
+    const { name, email, profile } = req.body;
+    const newImage = req.file;
 
-    // Get current user with profile data
     const currentUser = await prisma.user.findUnique({
       where: { id: userId },
       include: {
         studentProfile: true,
-        expertProfile: true
-      }
+        expertProfile: true,
+      },
     });
 
     if (!currentUser) {
+      if (newImage) {
+        fs.unlinkSync(path.join(__dirname, "../../uploads", newImage.filename));
+      }
       res.status(404).json({ message: "User not found" });
       return;
     }
 
-    const { name, email, image, profile } = req.body;
+    if (newImage && currentUser.image) {
+      const oldImagePath = path.join(__dirname, "../../uploads", currentUser.image);
+        if (fs.existsSync(oldImagePath)) {
+          fs.unlinkSync(oldImagePath);
+        }
+    }
 
     // Update basic user data
     const updatedUser = await prisma.user.update({
@@ -163,86 +201,120 @@ export const updateUser = async (req: AuthenticatedRequest, res: Response): Prom
       data: {
         name: name || currentUser.name,
         email: email || currentUser.email,
-        image: image || currentUser.image,
+        image: newImage ? newImage.filename : currentUser.image,
         // Update profile based on activeProfile
-        ...(currentUser.activeProfile === 'STUDENT' && {
-          studentProfile: profile ? {
-            upsert: {
-              create: {
-                profession: profile.profession,
-                organization: profile.organization,
-                location: profile.location,
-                description: profile.description
-              },
-              update: {
-                profession: profile.profession,
-                organization: profile.organization,
-                location: profile.location,
-                description: profile.description
+        ...(currentUser.activeProfile === "STUDENT" && {
+          studentProfile: profile
+            ? {
+                upsert: {
+                  create: {
+                    profession: profile.profession,
+                    organization: profile.organization,
+                    location: profile.location,
+                    description: profile.description,
+                  },
+                  update: {
+                    profession: profile.profession,
+                    organization: profile.organization,
+                    location: profile.location,
+                    description: profile.description,
+                  },
+                },
               }
-            }
-          } : undefined
+            : undefined,
         }),
-        ...(currentUser.activeProfile === 'EXPERT' && {
-          expertProfile: profile ? {
-            upsert: {
-              create: {
-                profession: profile.profession,
-                organization: profile.organization,
-                location: profile.location,
-                description: profile.description,
-                experience: profile.experience,
-                hourlyRate: profile.hourlyRate,
-                skills: profile.skills,
-                availableDays: profile.availableDays,
-                availableTime: profile.availableTime
-              },
-              update: {
-                profession: profile.profession,
-                organization: profile.organization,
-                location: profile.location,
-                description: profile.description,
-                experience: profile.experience,
-                hourlyRate: profile.hourlyRate,
-                skills: profile.skills,
-                availableDays: profile.availableDays,
-                availableTime: profile.availableTime
+        ...(currentUser.activeProfile === "EXPERT" && {
+          expertProfile: profile
+            ? {
+                upsert: {
+                  create: {
+                    profession: profile.profession,
+                    organization: profile.organization,
+                    location: profile.location,
+                    description: profile.description,
+                    experience: profile.experience,
+                    hourlyRate: profile.hourlyRate,
+                    skills: profile.skills,
+                    availableDays: profile.availableDays,
+                    availableTime: profile.availableTime,
+                  },
+                  update: {
+                    profession: profile.profession,
+                    organization: profile.organization,
+                    location: profile.location,
+                    description: profile.description,
+                    experience: profile.experience,
+                    hourlyRate: profile.hourlyRate,
+                    skills: profile.skills,
+                    availableDays: profile.availableDays,
+                    availableTime: profile.availableTime,
+                  },
+                },
               }
-            }
-          } : undefined
-        })
+            : undefined,
+        }),
       },
       include: {
         studentProfile: true,
-        expertProfile: true
-      }
+        expertProfile: true,
+      },
     });
+
+    const imageUrl = updatedUser.image
+      ? getImageUrl(`/uploads/${updatedUser.image}`)
+      : null;
 
     // Prepare response data based on activeProfile
     const responseData = {
       id: updatedUser.id,
       name: updatedUser.name,
       email: updatedUser.email,
-      image: updatedUser.image,
+      image: imageUrl,
       activeProfile: updatedUser.activeProfile,
-      profile: updatedUser.activeProfile === 'STUDENT' 
-        ? updatedUser.studentProfile 
-        : updatedUser.expertProfile
+      profile:
+        updatedUser.activeProfile === "STUDENT"
+          ? updatedUser.studentProfile
+          : updatedUser.expertProfile,
     };
 
     res.json({
+      success: true,
       message: "Profile updated successfully",
-      user: responseData
+      user: responseData,
     });
-
   } catch (error) {
+    if (req.file) {
+      const errorImagePath = path.join(__dirname, "../../uploads", req.file.filename);
+      if (fs.existsSync(errorImagePath)) {
+        fs.unlinkSync(errorImagePath);
+      }
+    }
+
     console.error("Update error:", error);
-    res.status(500).json({ 
-      message: "Failed to update profile", 
-      error: error instanceof Error ? error.message : "Internal server error" 
+    res.status(500).json({
+      success: false,
+      message: "Failed to update profile",
+      error: error instanceof Error ? error.message : "Internal server error",
     });
   }
 };
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
