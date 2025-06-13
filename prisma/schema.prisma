@@ -17,6 +17,7 @@ model User {
   id         String @id @default(cuid())
   linkedInId String @unique
 
+  sub       String?  //for linkedin identifier
   name      String?
   email     String?   @unique //for admin
   password  String? //for admin
@@ -153,7 +154,7 @@ model Notification {
   message String
   type    NotificationType
   isRead  Boolean          @default(false)
-
+  image   String?
   recipientId String
   recipient   User   @relation(fields: [recipientId], references: [id], onDelete: Cascade)
 

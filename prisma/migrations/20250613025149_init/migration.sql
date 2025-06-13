@@ -21,6 +21,7 @@ CREATE TABLE "User" (
     "email" TEXT,
     "password" TEXT,
     "lastLogin" TIMESTAMP(3),
+    "image" TEXT,
     "activeProfile" "Role" NOT NULL DEFAULT 'STUDENT',
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
@@ -124,6 +125,7 @@ CREATE TABLE "Notification" (
     "message" TEXT NOT NULL,
     "type" "NotificationType" NOT NULL,
     "isRead" BOOLEAN NOT NULL DEFAULT false,
+    "image" TEXT,
     "recipientId" TEXT NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
