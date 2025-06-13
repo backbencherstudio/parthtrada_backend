@@ -74,6 +74,7 @@ const downloadAndSaveImage = async (imageUrl: string): Promise<string> => {
   }
 };
 
+//main
 
 export const linkedinCallback = async (req: Request, res: Response) => {
   try {
@@ -295,6 +296,136 @@ export const updateUser = async (
       success: false,
       message: "Failed to update profile",
       error: error instanceof Error ? error.message : "Internal server error",
+    });
+  }
+};
+
+
+export const beExpart = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.user?.id;
+
+    const {
+      profession,
+      organization,
+      location,
+      description,
+      experience,
+      hourlyRate,
+      skills,
+      availableDays,
+      availableTime
+    } = req.body;
+
+    const requiredFields = [
+      "profession",
+      "organization",
+      "location",
+      "description",
+      "experience",
+      "hourlyRate",
+      "skills",
+      "availableDays",
+      "availableTime"
+    ];
+
+    const missingField = requiredFields.find((field) => !req.body[field]);
+
+    // Find current user with profile
+    const currentUser = await prisma.user.findUnique({
+      where: { id: userId },
+      include: {
+        studentProfile: true,
+        expertProfile: true,
+      },
+    });
+
+    if (!currentUser) {
+      res.status(404).json({
+        success: false,
+        message: "User not found"
+      });
+      return;
+    }
+
+    // If expertProfile doesn't exist, all fields must be provided
+    if (!currentUser.expertProfile && missingField) {
+      res.status(400).json({
+        success: false,
+        message: `${missingField} is required for first-time expert registration`
+      });
+      return;
+    }
+
+    // Create or update the expert profile
+    const updatedUser = await prisma.user.update({
+      where: { id: userId },
+      data: {
+        activeProfile: "EXPERT",
+        expertProfile: currentUser.expertProfile ? {
+          update: {
+            profession,
+            organization,
+            location,
+            description,
+            experience,
+            hourlyRate,
+            skills,
+            availableDays,
+            availableTime
+          }
+        } : {
+          create: {
+            profession,
+            organization,
+            location,
+            description,
+            experience,
+            hourlyRate,
+            skills,
+            availableDays,
+            availableTime
+          }
+        }
+      },
+      include: {
+        studentProfile: true,
+        expertProfile: true,
+      }
+    });
+
+    // Generate JWT
+    const token = jwt.sign(
+      {
+        id: updatedUser.id,
+        email: updatedUser.email,
+        name: updatedUser.name,
+        activeProfile: updatedUser.activeProfile,
+      },
+      process.env.JWT_SECRET as string,
+      { expiresIn: "7d" }
+    );
+
+    const responseData = {
+      id: updatedUser.id,
+      name: updatedUser.name,
+      email: updatedUser.email,
+      image: updatedUser.image ? getImageUrl(`/uploads/${updatedUser.image}`) : null,
+      activeProfile: updatedUser.activeProfile,
+      profile: updatedUser.expertProfile
+    };
+
+    res.json({
+      success: true,
+      message: "Successfully became an expert",
+      token,
+      user: responseData
+    });
+
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error instanceof Error ? error.message : "Something went wrong"
     });
   }
 };
