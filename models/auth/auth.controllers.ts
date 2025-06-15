@@ -348,11 +348,20 @@ export const beExpart = async (req: AuthenticatedRequest, res: Response): Promis
       return;
     }
 
+    if (currentUser.expertProfile) {
+      res.status(400).json({
+        success: false,
+        message: "You are already an expert"
+      });
+      return;
+    }
+
+
     // If expertProfile doesn't exist, all fields must be provided
     if (!currentUser.expertProfile && missingField) {
       res.status(400).json({
         success: false,
-        message: `${missingField} is required for first-time expert registration`
+        message: `${missingField} is required`
       });
       return;
     }

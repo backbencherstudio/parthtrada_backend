@@ -21,11 +21,11 @@ export const verifyUser = (...allowedRoles: string[]) => {
       const token = authHeader;
       const decoded = jwt.verify(token, process.env.JWT_SECRET as string);
       req.user = decoded;
-
+      console.log(req.user )
       if (
         allowedRoles.length &&
         !allowedRoles.includes("ANY") &&
-        !allowedRoles.includes(req.user?.role)
+        !allowedRoles.includes(req.user?.activeProfile)
       ) {
         res
           .status(403)
