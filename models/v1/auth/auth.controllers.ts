@@ -64,16 +64,22 @@ const downloadAndSaveImage = async (imageUrl: string): Promise<string> => {
 
     const buffer = await response.arrayBuffer();
     const filename = `${uuidv4()}.jpg`;
-    const filepath = path.join(__dirname, "../../uploads", filename);
+    const uploadDir = path.join(__dirname, "../../../uploads");
 
+    // Ensure uploads directory exists
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+
+    const filepath = path.join(uploadDir, filename);
     fs.writeFileSync(filepath, Buffer.from(buffer));
+
     return filename;
   } catch (error) {
     console.error("Error saving image:", error);
     return imageUrl;
   }
 };
-
 
 export const linkedinCallback = async (req: Request, res: Response) => {
   try {
@@ -159,6 +165,59 @@ export const linkedinCallback = async (req: Request, res: Response) => {
     res.status(statusCode).json({
       message: "Authentication failed",
       error: errorMessage,
+    });
+  }
+};
+
+export const fordev = async (req: Request, res: Response) => {
+  try {
+    const { email } = req.body;
+    console.log(email);
+
+    // Validate input
+    if (!email) {
+      res
+        .status(400)
+        .json({ success: false, message: "Email and password are required" });
+      return;
+    }
+
+    // Find user
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (!user) {
+      res.status(401).json({ success: false, message: "Invalid credentials" });
+      return;
+    }
+
+    // Create token
+    const token = jwt.sign(
+      {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        activeProfile: user.activeProfile,
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: "7d" }
+    );
+
+    // Optional: Update lastLogin
+    let data = await prisma.user.update({
+      where: { id: user.id },
+      data: { lastLogin: new Date() },
+    });
+
+    res.status(200).json({
+      success: true,
+      message: "Login successful",
+      token,
+      data,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to login",
+      error: error instanceof Error ? error.message : "Internal server error",
     });
   }
 };
@@ -542,3 +601,5 @@ export const beStudent = async (
 // };
 
 // export default Login;
+
+// eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6ImNtYzRkejAzcjAwMDB1b3R3M3J4ZnJjcGkiLCJlbWFpbCI6InRxbWhvc2FpbkBnbWFpbC5jb20iLCJuYW1lIjoiVFFNIEhvc2FpbiIsImFjdGl2ZVByb2ZpbGUiOiJTVFVERU5UIiwiaWF0IjoxNzUwMzk4MzMwLCJleHAiOjE3NTEwMDMxMzB9.JoosjkTH57iFeRIf2NceGAYR99jaJ7M99HWhSrtu2pc
