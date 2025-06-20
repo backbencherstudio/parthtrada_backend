@@ -1,7 +1,8 @@
 import express, { Request, Response, NextFunction } from "express";
 import cors from "cors";
 import morgan from "morgan";
-import authRoutes from './models/auth/auth.routes';
+import authRoutes from './models/v1/auth/auth.routes';
+import booking from './models/v1/booking/booking.routes'
 import path from "path";
 
 const app = express();
@@ -26,6 +27,7 @@ app.use(express.json());
 app.use(morgan("dev"));
 
 app.use('/auth', authRoutes);
+app.use('/booking', booking )
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 app.use((req: Request, res: Response, next: NextFunction) => {

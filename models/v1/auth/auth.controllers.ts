@@ -2,11 +2,11 @@ import { Request, Response } from "express";
 import { PrismaClient } from "@prisma/client";
 import jwt from "jsonwebtoken";
 import dotenv from "dotenv";
-import { AuthenticatedRequest } from "../../middleware/verifyUsers";
+import { AuthenticatedRequest } from "../../../middleware/verifyUsers";
 import fs from "fs";
 import path from "path";
 import { v4 as uuidv4 } from "uuid";
-import { baseUrl, getImageUrl } from "../../utils/base_utl";
+import { baseUrl, getImageUrl } from "../../../utils/base_utl";
 
 dotenv.config();
 
@@ -74,7 +74,6 @@ const downloadAndSaveImage = async (imageUrl: string): Promise<string> => {
   }
 };
 
-//main
 
 export const linkedinCallback = async (req: Request, res: Response) => {
   try {
@@ -190,10 +189,14 @@ export const updateUser = async (
     }
 
     if (newImage && currentUser.image) {
-      const oldImagePath = path.join(__dirname, "../../uploads", currentUser.image);
-        if (fs.existsSync(oldImagePath)) {
-          fs.unlinkSync(oldImagePath);
-        }
+      const oldImagePath = path.join(
+        __dirname,
+        "../../uploads",
+        currentUser.image
+      );
+      if (fs.existsSync(oldImagePath)) {
+        fs.unlinkSync(oldImagePath);
+      }
     }
 
     // Update basic user data
@@ -285,7 +288,11 @@ export const updateUser = async (
     });
   } catch (error) {
     if (req.file) {
-      const errorImagePath = path.join(__dirname, "../../uploads", req.file.filename);
+      const errorImagePath = path.join(
+        __dirname,
+        "../../uploads",
+        req.file.filename
+      );
       if (fs.existsSync(errorImagePath)) {
         fs.unlinkSync(errorImagePath);
       }
@@ -300,8 +307,10 @@ export const updateUser = async (
   }
 };
 
-
-export const beExpart = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+export const beExpart = async (
+  req: AuthenticatedRequest,
+  res: Response
+): Promise<void> => {
   try {
     const userId = req.user?.id;
 
@@ -314,7 +323,7 @@ export const beExpart = async (req: AuthenticatedRequest, res: Response): Promis
       hourlyRate,
       skills,
       availableDays,
-      availableTime
+      availableTime,
     } = req.body;
 
     const requiredFields = [
@@ -326,7 +335,7 @@ export const beExpart = async (req: AuthenticatedRequest, res: Response): Promis
       "hourlyRate",
       "skills",
       "availableDays",
-      "availableTime"
+      "availableTime",
     ];
 
     const missingField = requiredFields.find((field) => !req.body[field]);
@@ -343,25 +352,24 @@ export const beExpart = async (req: AuthenticatedRequest, res: Response): Promis
     if (!currentUser) {
       res.status(404).json({
         success: false,
-        message: "User not found"
+        message: "User not found",
       });
       return;
     }
 
-    if (currentUser.expertProfile) {
-      res.status(400).json({
-        success: false,
-        message: "You are already an expert"
-      });
-      return;
-    }
-
+    // if (currentUser.expertProfile) {
+    //   res.status(400).json({
+    //     success: false,
+    //     message: "You are already an expert"
+    //   });
+    //   return;
+    // }
 
     // If expertProfile doesn't exist, all fields must be provided
     if (!currentUser.expertProfile && missingField) {
       res.status(400).json({
         success: false,
-        message: `${missingField} is required`
+        message: `${missingField} is required`,
       });
       return;
     }
@@ -371,36 +379,38 @@ export const beExpart = async (req: AuthenticatedRequest, res: Response): Promis
       where: { id: userId },
       data: {
         activeProfile: "EXPERT",
-        expertProfile: currentUser.expertProfile ? {
-          update: {
-            profession,
-            organization,
-            location,
-            description,
-            experience,
-            hourlyRate,
-            skills,
-            availableDays,
-            availableTime
-          }
-        } : {
-          create: {
-            profession,
-            organization,
-            location,
-            description,
-            experience,
-            hourlyRate,
-            skills,
-            availableDays,
-            availableTime
-          }
-        }
+        expertProfile: currentUser.expertProfile
+          ? {
+              update: {
+                profession,
+                organization,
+                location,
+                description,
+                experience,
+                hourlyRate,
+                skills,
+                availableDays,
+                availableTime,
+              },
+            }
+          : {
+              create: {
+                profession,
+                organization,
+                location,
+                description,
+                experience,
+                hourlyRate,
+                skills,
+                availableDays,
+                availableTime,
+              },
+            },
       },
       include: {
         studentProfile: true,
         expertProfile: true,
-      }
+      },
     });
 
     // Generate JWT
@@ -419,49 +429,96 @@ export const beExpart = async (req: AuthenticatedRequest, res: Response): Promis
       id: updatedUser.id,
       name: updatedUser.name,
       email: updatedUser.email,
-      image: updatedUser.image ? getImageUrl(`/uploads/${updatedUser.image}`) : null,
+      image: updatedUser.image
+        ? getImageUrl(`/uploads/${updatedUser.image}`)
+        : null,
       activeProfile: updatedUser.activeProfile,
-      profile: updatedUser.expertProfile
+      profile: updatedUser.expertProfile,
     };
 
     res.json({
       success: true,
       message: "Successfully became an expert",
       token,
-      user: responseData
+      user: responseData,
     });
-
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: error instanceof Error ? error.message : "Something went wrong"
+      message: error instanceof Error ? error.message : "Something went wrong",
     });
   }
 };
 
+export const beStudent = async (
+  req: AuthenticatedRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const userId = req.user?.id;
 
+    const currentUser = await prisma.user.findUnique({
+      where: { id: userId },
+      include: {
+        studentProfile: true,
+        expertProfile: true,
+      },
+    });
 
+    if (!currentUser) {
+      res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+      return;
+    }
 
+    const updatedUser = await prisma.user.update({
+      where: { id: userId },
+      data: {
+        activeProfile: "STUDENT",
+      },
+      include: {
+        studentProfile: true,
+        expertProfile: true,
+      },
+    });
 
+    const token = jwt.sign(
+      {
+        id: updatedUser.id,
+        email: updatedUser.email,
+        name: updatedUser.name,
+        activeProfile: updatedUser.activeProfile,
+      },
+      process.env.JWT_SECRET as string,
+      { expiresIn: "7d" }
+    );
 
+    const responseData = {
+      id: updatedUser.id,
+      name: updatedUser.name,
+      email: updatedUser.email,
+      image: updatedUser.image
+        ? getImageUrl(`/uploads/${updatedUser.image}`)
+        : null,
+      activeProfile: updatedUser.activeProfile,
+      profile: updatedUser.studentProfile,
+    };
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    res.json({
+      success: true,
+      message: "Successfully became a student",
+      token,
+      user: responseData,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error instanceof Error ? error.message : "Something went wrong",
+    });
+  }
+};
 
 // import React from "react";
 
