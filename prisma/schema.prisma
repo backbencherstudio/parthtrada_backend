@@ -62,9 +62,6 @@ model StudentProfile {
   userId String @unique
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  stripeAccountId    String?
-  isOnboardCompleted Boolean @default(false)
-
   chatRoomsAsStudent ChatRoom[] @relation("StudentProfileToChatRoom")
 }
 
@@ -80,6 +77,9 @@ model ExpertProfile {
   skills        String[]
   availableDays String[]
   availableTime String[]
+
+  stripeAccountId    String?
+  isOnboardCompleted Boolean @default(false)
 
   userId String @unique
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
