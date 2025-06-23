@@ -17,13 +17,12 @@ model User {
   id         String @id @default(cuid())
   linkedInId String @unique
 
-
-  name      String?
-  email     String?   @unique //for admin
-  password  String? //for admin
-  lastLogin DateTime?
-  image     String?
-  activeProfile Role @default(STUDENT)
+  name          String?
+  email         String?   @unique //for admin
+  password      String? //for admin
+  lastLogin     DateTime?
+  image         String?
+  activeProfile Role      @default(STUDENT)
 
   studentProfile StudentProfile?
   expertProfile  ExpertProfile?
@@ -62,6 +61,9 @@ model StudentProfile {
 
   userId String @unique
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  stripeAccountId    String?
+  isOnboardCompleted Boolean @default(false)
 
   chatRoomsAsStudent ChatRoom[] @relation("StudentProfileToChatRoom")
 }
@@ -127,17 +129,17 @@ model Review {
   rating      Int
   description String?
 
-  bookingId   String?   @unique
-  booking     Booking?  @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+  bookingId String?  @unique
+  booking   Booking? @relation(fields: [bookingId], references: [id], onDelete: SetNull)
 
-  studentId   String
-  expertId    String 
+  studentId String
+  expertId  String
 
-  student     User       @relation("StudentReview", fields: [studentId], references: [id])
-  expert      User       @relation("ExpertReview", fields: [expertId], references: [id])
+  student User @relation("StudentReview", fields: [studentId], references: [id])
+  expert  User @relation("ExpertReview", fields: [expertId], references: [id])
 
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 // | Field       | মানে                       |
@@ -146,52 +148,46 @@ model Review {
 // | `expertId`  | কাকে review দিল            |
 // | `bookingId` | কোন session-এর জন্য review |
 
-
-
 model Notification {
-  id      String           @id @default(cuid())
-  title   String
-  message String
-  type    NotificationType
-  isRead  Boolean          @default(false)
-  image   String?
+  id          String           @id @default(cuid())
+  title       String
+  message     String
+  type        NotificationType
+  isRead      Boolean          @default(false)
+  image       String?
   recipientId String
-  recipient   User   @relation(fields: [recipientId], references: [id], onDelete: Cascade)
+  recipient   User             @relation(fields: [recipientId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
 }
 
-
 model ChatRoom {
-  id           String   @id @default(cuid())
+  id String @id @default(cuid())
 
-  studentId    String?
-  expertId     String?
+  studentId String?
+  expertId  String?
 
-  student      StudentProfile? @relation("StudentProfileToChatRoom", fields: [studentId], references: [id],  onDelete: SetNull)
-  expert       ExpertProfile? @relation("ExpertProfileToChatRoom", fields: [expertId], references: [id], onDelete: SetNull)
+  student StudentProfile? @relation("StudentProfileToChatRoom", fields: [studentId], references: [id], onDelete: SetNull)
+  expert  ExpertProfile?  @relation("ExpertProfileToChatRoom", fields: [expertId], references: [id], onDelete: SetNull)
 
-  messages     Message[]
+  messages Message[]
 
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
-
 
 model Message {
-  id           String   @id @default(cuid())
-  content      String
+  id      String @id @default(cuid())
+  content String
 
-  senderType   Role   
-  senderId     String 
-  chatRoomId   String
+  senderType Role
+  senderId   String
+  chatRoomId String
 
-  chatRoom     ChatRoom @relation(fields: [chatRoomId], references: [id], onDelete: Cascade)
+  chatRoom ChatRoom @relation(fields: [chatRoomId], references: [id], onDelete: Cascade)
 
-  createdAt    DateTime @default(now())
+  createdAt DateTime @default(now())
 }
-
-
 
 enum BookingStatus {
   UPCOMING
@@ -219,18 +215,15 @@ enum Role {
 }
 
 enum NotificationType {
-  BOOKING_REQUESTED          
-  BOOKING_CONFIRMED         
+  BOOKING_REQUESTED
+  BOOKING_CONFIRMED
   BOOKING_CANCELLED_BY_STUDENT
   BOOKING_CANCELLED_BY_EXPERT
-  SESSION_STARTED            
-  SESSION_COMPLETED          
-  REVIEW_RECEIVED             
-  PAYMENT_SUCCESS            
-  PAYMENT_FAILED            
-  EXPERT_EARNED_MONEY        
-  SYSTEM_ALERT              
+  SESSION_STARTED
+  SESSION_COMPLETED
+  REVIEW_RECEIVED
+  PAYMENT_SUCCESS
+  PAYMENT_FAILED
+  EXPERT_EARNED_MONEY
+  SYSTEM_ALERT
 }
-
-
-
