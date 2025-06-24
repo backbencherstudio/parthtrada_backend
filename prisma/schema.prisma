@@ -98,9 +98,9 @@ model Booking {
   sessionDuration Int
   status          BookingStatus @default(UPCOMING)
 
-  answer1       String
-  answer2       String
-  answer3       String
+  answer1       String?
+  answer2       String?
+  answer3       String?
 
   student     User?        @relation("StudentBookings", fields: [studentId], references: [id], onDelete: SetNull)
   expert      User?        @relation("ExpertBookings", fields: [expertId], references: [id], onDelete: SetNull)
