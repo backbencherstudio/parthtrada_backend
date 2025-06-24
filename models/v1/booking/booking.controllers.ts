@@ -6,6 +6,8 @@ import type { AuthenticatedRequest } from "../../../middleware/verifyUsers";
 const prisma = new PrismaClient();
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
+
+
 export const createBooking = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const userId = req.user?.id;

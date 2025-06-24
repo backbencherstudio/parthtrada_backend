@@ -17,7 +17,9 @@ app.use(
       "http://localhost:3002",
       "http://localhost:3003",
       "http://localhost:5174",
-      "http://localhost:5173"
+      "http://localhost:5173",
+      "https://v0-fontend-development.vercel.app",
+      "https://v0-hello-woad-pi.vercel.app"
     ],
   })
 );
