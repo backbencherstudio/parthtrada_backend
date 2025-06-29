@@ -70,6 +70,9 @@ export const createBooking = async (req: AuthenticatedRequest, res: Response) =>
       capture_method: "manual",
     });
 
+
+    console.log(paymentIntent)
+
     // Create transaction record
     await prisma.transaction.create({
       data: {

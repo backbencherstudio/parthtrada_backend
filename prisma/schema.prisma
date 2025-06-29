@@ -23,6 +23,7 @@ model User {
   lastLogin     DateTime?
   image         String?
   activeProfile Role      @default(STUDENT)
+  timeZone      String?
 
   studentProfile StudentProfile?
   expertProfile  ExpertProfile?
@@ -58,7 +59,6 @@ model StudentProfile {
   organization String?
   location     String?
   description  String?
-  timeZone     String?
 
   userId String @unique
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -75,7 +75,6 @@ model ExpertProfile {
   description   String?
   experience    String?
   hourlyRate    String?
-  timeZone      String?
   skills        String[]
   availableDays String[]
   availableTime String[]
