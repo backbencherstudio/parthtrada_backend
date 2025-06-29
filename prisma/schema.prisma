@@ -148,7 +148,7 @@ model Review {
   updatedAt DateTime @updatedAt
 }
 
-// | Field       | মানে                       |
+// | Field       | মানে                        |
 // | ----------- | -------------------------- |
 // | `studentId` | কে review দিল              |
 // | `expertId`  | কাকে review দিল            |
@@ -180,6 +180,8 @@ model ChatRoom {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@unique([studentId, expertId])
 }
 
 model Message {
