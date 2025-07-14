@@ -194,6 +194,7 @@ model Message {
   senderType Role
   senderId   String
   chatRoomId String
+  isRead     Boolean @default(false)
 
   chatRoom ChatRoom @relation(fields: [chatRoomId], references: [id], onDelete: Cascade)
 

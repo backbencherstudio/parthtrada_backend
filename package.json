@@ -28,7 +28,8 @@
     "nodemon": "^3.1.10",
     "socket.io": "^4.8.1",
     "stripe": "^18.2.1",
-    "uuid": "^11.1.0"
+    "uuid": "^11.1.0",
+    "uuidv4": "^6.2.13"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",

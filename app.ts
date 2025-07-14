@@ -48,6 +48,6 @@ app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
   });
 });
 
-app.use(express.static(path.join(__dirname, "public")));
+// app.use(express.static(path.join(__dirname, "public")));
 
 export default app;
