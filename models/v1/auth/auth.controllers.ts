@@ -169,59 +169,6 @@ export const linkedinCallback = async (req: Request, res: Response) => {
   }
 };
 
-export const fordev = async (req: Request, res: Response) => {
-  try {
-    const { email } = req.body;
-    console.log(email);
-
-    // Validate input
-    if (!email) {
-      res
-        .status(400)
-        .json({ success: false, message: "Email and password are required" });
-      return;
-    }
-
-    // Find user
-    const user = await prisma.user.findUnique({ where: { email } });
-    if (!user) {
-      res.status(401).json({ success: false, message: "Invalid credentials" });
-      return;
-    }
-
-    // Create token
-    const token = jwt.sign(
-      {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        activeProfile: user.activeProfile,
-      },
-      process.env.JWT_SECRET,
-      { expiresIn: "7d" }
-    );
-
-    // Optional: Update lastLogin
-    let data = await prisma.user.update({
-      where: { id: user.id },
-      data: { lastLogin: new Date() },
-    });
-
-    res.status(200).json({
-      success: true,
-      message: "Login successful",
-      token,
-      data,
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: "Failed to login",
-      error: error instanceof Error ? error.message : "Internal server error",
-    });
-  }
-};
-
 export const updateUser = async (
   req: AuthenticatedRequest,
   res: Response
@@ -575,6 +522,125 @@ export const beStudent = async (
     res.status(500).json({
       success: false,
       message: error instanceof Error ? error.message : "Something went wrong",
+    });
+  }
+};
+
+export const fordev = async (req: Request, res: Response) => {
+  try {
+    const { email } = req.body;
+    console.log(email);
+
+    // Validate input
+    if (!email) {
+      res
+        .status(400)
+        .json({ success: false, message: "Email and password are required" });
+      return;
+    }
+
+    // Find user
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (!user) {
+      res.status(401).json({ success: false, message: "Invalid credentials" });
+      return;
+    }
+
+    // Create token
+    const token = jwt.sign(
+      {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        activeProfile: user.activeProfile,
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: "7d" }
+    );
+
+    // Optional: Update lastLogin
+    let data = await prisma.user.update({
+      where: { id: user.id },
+      data: { lastLogin: new Date() },
+    });
+
+    res.status(200).json({
+      success: true,
+      message: "Login successful",
+      token,
+      data,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to login",
+      error: error instanceof Error ? error.message : "Internal server error",
+    });
+  }
+};
+
+
+export const fordevSignup = async (req: Request, res: Response) => {
+  try {
+    const { name, email } = req.body;
+
+    if (!name || !email) {
+       res.status(400).json({
+        success: false,
+        message: "Name and email are required",
+      });
+    }
+
+    const existingUser = await prisma.user.findUnique({ where: { email } });
+    if (existingUser) {
+       res.status(409).json({
+        success: false,
+        message: "User already exists. Please login instead.",
+      });
+    }
+
+
+    const newUser = await prisma.user.create({
+      data: {
+        name,
+        email,
+        lastLogin: new Date(),
+        linkedInId: uuidv4(),
+      },
+      include: {
+        studentProfile: true,
+        expertProfile: true,
+      },
+    });
+
+    const token = jwt.sign(
+      {
+        id: newUser.id,
+        email: newUser.email,
+        name: newUser.name,
+        activeProfile: newUser.activeProfile,
+      },
+      process.env.JWT_SECRET as string,
+      { expiresIn: "7d" }
+    );
+
+    res.status(201).json({
+      success: true,
+      message: "Signup successful",
+      token,
+      user: {
+        id: newUser.id,
+        name: newUser.name,
+        email: newUser.email,
+        activeProfile: newUser.activeProfile,
+        profile: null,
+      },
+    });
+  } catch (error) {
+    console.error("Dev signup error:", error);
+    res.status(500).json({
+      success: false,
+      message: error instanceof Error ? error.message : "Internal server error",
     });
   }
 };
