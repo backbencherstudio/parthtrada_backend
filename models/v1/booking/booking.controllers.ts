@@ -16,48 +16,60 @@ export const createBooking = async (req: AuthenticatedRequest, res: Response) =>
     const { expertId, date, time, sessionDuration, sessionDetails, amount } = req.body;
     // Validation
     if (!expertId || !date || !time || !sessionDuration || !sessionDetails || !amount) {
-       res.status(400).json({
+      res.status(400).json({
         success: false,
         message: "All booking details are required",
       });
       return
     }
+    // console.log("body",expertId)
 
     // Check if expert has completed Stripe onboarding
     const expert = await prisma.expertProfile.findUnique({
       where: { userId: expertId },
       include: { user: true }
     });
-    console.log(expert.user.timeZone)
     // if (!expert?.stripeAccountId || !expert.isOnboardCompleted) {
-    //    res.status(400).json({
-    //     success: false,
-    //     message: "Expert has not completed payment setup",
-    //   });
-    //   return
-    // }
-
+    //      res.status(400).json({
+    //         success: false,
+    //         message: "Expert has not completed payment setup",
+    //       });
+    //       return
+    //     }
+        
     // get the student user details
-    const student = await prisma.studentProfile.findUnique({
-      where: { userId: userId },
-      include: { user: true }
+    const student = await prisma.user.findUnique({
+        where: { id: userId },
     });
+        
+     // Combine date and time to create a complete datetime string
+    const expertDateTime = `${date} ${time}`;
 
-    // convert the selected time from the expert time zone to the student's time zone
-    const expertTime = moment.tz(`${date} ${time}`, expert.user.timeZone)
+    // Fetch time-zone strings from the user records (should be valid IANA tz names)
+    const expertTimeZone = expert?.user?.timeZone || "UTC";
+    const studentTimeZone = student?.timeZone || "UTC";
 
-    // convert expert time zone to student's time zone
-    const studentTime = expertTime.clone().tz(student.user.timeZone).toDate();
+    // Create a moment object in the expert's time zone
+    const expertMoment = moment.tz(expertDateTime, "YYYY-MM-DD hh:mm a", expertTimeZone);
 
-    console.log("eee",expertTime)
-    console.log("eee",studentTime)
+    // Convert the moment to the student's time zone
+    const studentMoment = expertMoment.clone().tz(studentTimeZone);
+
+    // Format both timestamps for storage / display
+    const formattedExpertTime = expertMoment.format("YYYY-MM-DD HH:mm:ss");
+    const formattedStudentTime = studentMoment.format("YYYY-MM-DD HH:mm:ss");
+
+    console.log(`Expert Time (${expertTimeZone}):`, formattedExpertTime);
+    console.log(`Student Time (${studentTimeZone}):`, formattedStudentTime);
+
     // // Create booking record
     // const booking = await prisma.booking.create({
     //   data: {
     //     studentId: userId,
     //     expertId,
-    //     date: new Date(date),
-    //     time,
+    //     date: expertMoment.toDate(),
+    //     expertDateTime: formattedExpertTime,
+    //     studentDateTime: formattedStudentTime,
     //     sessionDuration,
     //     sessionDetails,
     //     status: "UPCOMING",
