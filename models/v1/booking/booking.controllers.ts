@@ -1,7 +1,8 @@
-import type { Request, Response } from "express";
+import type { Response } from "express";
 import { PrismaClient } from "@prisma/client";
 import Stripe from "stripe";
 import type { AuthenticatedRequest } from "../../../middleware/verifyUsers";
+import moment from 'moment-timezone'
 
 const prisma = new PrismaClient();
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
@@ -11,8 +12,8 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 export const createBooking = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const userId = req.user?.id;
+    // console.log(userId)
     const { expertId, date, time, sessionDuration, sessionDetails, amount } = req.body;
-
     // Validation
     if (!expertId || !date || !time || !sessionDuration || !sessionDetails || !amount) {
        res.status(400).json({
@@ -27,74 +28,88 @@ export const createBooking = async (req: AuthenticatedRequest, res: Response) =>
       where: { userId: expertId },
       include: { user: true }
     });
+    console.log(expert.user.timeZone)
+    // if (!expert?.stripeAccountId || !expert.isOnboardCompleted) {
+    //    res.status(400).json({
+    //     success: false,
+    //     message: "Expert has not completed payment setup",
+    //   });
+    //   return
+    // }
 
-    if (!expert?.stripeAccountId || !expert.isOnboardCompleted) {
-       res.status(400).json({
-        success: false,
-        message: "Expert has not completed payment setup",
-      });
-      return
-    }
-
-    // Create booking record
-    const booking = await prisma.booking.create({
-      data: {
-        studentId: userId,
-        expertId,
-        date: new Date(date),
-        time,
-        sessionDuration,
-        sessionDetails,
-        status: "UPCOMING",
-      },
+    // get the student user details
+    const student = await prisma.studentProfile.findUnique({
+      where: { userId: userId },
+      include: { user: true }
     });
 
-    // Calculate platform fee (10%)
-    const platformFee = Math.round(amount * 100 * 0.1);
-    const amountInCents = Math.round(amount * 100);
+    // convert the selected time from the expert time zone to the student's time zone
+    const expertTime = moment.tz(`${date} ${time}`, expert.user.timeZone)
 
-    // Create Stripe PaymentIntent with Connect
-    const paymentIntent = await stripe.paymentIntents.create({
-      amount: amountInCents,
-      currency: "usd",
-      application_fee_amount: platformFee,
-      transfer_data: {
-        destination: expert.stripeAccountId,
-      },
-      metadata: {
-        bookingId: booking.id,
-        studentId: userId!,
-        expertId,
-      },
-      // Capture later after session completion
-      capture_method: "manual",
-    });
+    // convert expert time zone to student's time zone
+    const studentTime = expertTime.clone().tz(student.user.timeZone).toDate();
+
+    console.log("eee",expertTime)
+    console.log("eee",studentTime)
+    // // Create booking record
+    // const booking = await prisma.booking.create({
+    //   data: {
+    //     studentId: userId,
+    //     expertId,
+    //     date: new Date(date),
+    //     time,
+    //     sessionDuration,
+    //     sessionDetails,
+    //     status: "UPCOMING",
+    //   },
+    // });
+
+    // // Calculate platform fee (10%)
+    // const platformFee = Math.round(amount * 100 * 0.1);
+    // const amountInCents = Math.round(amount * 100);
+
+    // // Create Stripe PaymentIntent with Connect
+    // const paymentIntent = await stripe.paymentIntents.create({
+    //   amount: amountInCents,
+    //   currency: "usd",
+    //   application_fee_amount: platformFee,
+    //   transfer_data: {
+    //     destination: expert.stripeAccountId,
+    //   },
+    //   metadata: {
+    //     bookingId: booking.id,
+    //     studentId: userId!,
+    //     expertId,
+    //   },
+    //   // Capture later after session completion
+    //   capture_method: "manual",
+    // });
 
 
-    console.log(paymentIntent)
+    // // console.log(paymentIntent)
 
-    // Create transaction record
-    await prisma.transaction.create({
-      data: {
-        bookingId: booking.id,
-        amount,
-        currency: "usd",
-        provider: "STRIPE",
-        providerId: paymentIntent.id,
-        status: "PENDING",
-      },
-    });
+    // // Create transaction record
+    // await prisma.transaction.create({
+    //   data: {
+    //     bookingId: booking.id,
+    //     amount,
+    //     currency: "usd",
+    //     provider: "STRIPE",
+    //     providerId: paymentIntent.id,
+    //     status: "PENDING",
+    //   },
+    // });
 
-    res.json({
-      success: true,
-      message: "Booking created successfully",
-      data: {
-        bookingId: booking.id,
-        clientSecret: paymentIntent.client_secret,
-        amount,
-        paymentIntentId: paymentIntent.id,
-      },
-    });
+    // res.json({
+    //   success: true,
+    //   message: "Booking created successfully",
+    //   data: {
+    //     bookingId: booking.id,
+    //     clientSecret: paymentIntent.client_secret,
+    //     amount,
+    //     paymentIntentId: paymentIntent.id,
+    //   },
+    // });
   } catch (error) {
     console.error("Error creating booking:", error);
     res.status(500).json({

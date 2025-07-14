@@ -93,7 +93,10 @@ model Booking {
   studentId       String?
   expertId        String?
   date            DateTime
-  time            String
+  
+  expertTime            String
+  studentTime            String
+
   meetingLink     String?
   sessionDetails  Json
   sessionDuration Int

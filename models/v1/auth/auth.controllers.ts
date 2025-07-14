@@ -42,7 +42,7 @@ const fetchAccessToken = async (code: string) => {
 };
 
 const fetchUserInfo = async (accessToken: string) => {
-  console.log(LINKEDIN_CONFIG);
+  // console.log(LINKEDIN_CONFIG);
   const response = await fetch(LINKEDIN_CONFIG.userInfoEndpoint, {
     headers: {
       Authorization: `Bearer ${accessToken}`,
@@ -92,7 +92,7 @@ export const linkedinCallback = async (req: Request, res: Response) => {
 
     const tokenData = await fetchAccessToken(code);
     const userInfo = await fetchUserInfo(tokenData.access_token);
-    console.log(userInfo);
+    console.log("userInfo",userInfo);
 
     // Download and save the profile picture
 
@@ -148,6 +148,7 @@ export const linkedinCallback = async (req: Request, res: Response) => {
           ? user.studentProfile
           : user.expertProfile,
     };
+
 
     res.json({
       message: "Authentication successful",
