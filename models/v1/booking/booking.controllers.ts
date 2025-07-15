@@ -3,6 +3,7 @@ import { PrismaClient } from "@prisma/client";
 import Stripe from "stripe";
 import type { AuthenticatedRequest } from "../../../middleware/verifyUsers";
 import moment from 'moment-timezone'
+import { createZoomMeeting } from '../../../utils/zoom.utils'
 
 const prisma = new PrismaClient();
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
@@ -59,22 +60,46 @@ export const createBooking = async (req: AuthenticatedRequest, res: Response) =>
     const formattedExpertTime = expertMoment.format("YYYY-MM-DD HH:mm:ss");
     const formattedStudentTime = studentMoment.format("YYYY-MM-DD HH:mm:ss");
 
-    console.log(`Expert Time (${expertTimeZone}):`, formattedExpertTime);
-    console.log(`Student Time (${studentTimeZone}):`, formattedStudentTime);
+    // console.log(`Expert Time (${expertTimeZone}):`, formattedExpertTime);
+    // console.log(`Student Time (${studentTimeZone}):`, formattedStudentTime);
+
+    // 1️⃣ Create Zoom meeting scheduled in expert's timezone
+    let meetingLink: string | undefined;
+    try {
+      const zoomMeeting = await createZoomMeeting({
+        topic: `Session with ${student?.name ?? 'Student'}`,
+        startTime: expertMoment.toDate(),
+        duration: sessionDuration, // expecting minutes
+        agenda: typeof sessionDetails === 'string' ? sessionDetails : undefined,
+        timezone: expertTimeZone,
+      });
+      // console.log("meetingLink", zoomMeeting)
+      meetingLink = zoomMeeting.join_url;
+    } catch (zoomErr) {
+      // console.error('Failed to create Zoom meeting', zoomErr);
+      // If Zoom creation fails, we can choose to proceed without it or abort. Here we abort.
+      res.status(500).json({
+        success: false,
+        message: 'Failed to create Zoom meeting',
+      });
+      return;
+    }
 
     // // Create booking record
-    // const booking = await prisma.booking.create({
-    //   data: {
-    //     studentId: userId,
-    //     expertId,
-    //     date: expertMoment.toDate(),
-    //     expertDateTime: formattedExpertTime,
-    //     studentDateTime: formattedStudentTime,
-    //     sessionDuration,
-    //     sessionDetails,
-    //     status: "UPCOMING",
-    //   },
-    // });
+    const booking = await prisma.booking.create({
+      data: {
+        studentId: userId,
+        expertId,
+        date: expertMoment.toDate(),
+        expertDateTime: expertMoment.toDate(),
+        studentDateTime: studentMoment.toDate(),
+        meetingLink,
+        sessionDuration,
+        sessionDetails,
+        status: "UPCOMING",
+      },
+    });
+    console.log("booking", booking)
 
     // // Calculate platform fee (10%)
     // const platformFee = Math.round(amount * 100 * 0.1);
@@ -92,6 +117,7 @@ export const createBooking = async (req: AuthenticatedRequest, res: Response) =>
     //     bookingId: booking.id,
     //     studentId: userId!,
     //     expertId,
+    //     meetingLink,
     //   },
     //   // Capture later after session completion
     //   capture_method: "manual",
@@ -117,9 +143,10 @@ export const createBooking = async (req: AuthenticatedRequest, res: Response) =>
     //   message: "Booking created successfully",
     //   data: {
     //     bookingId: booking.id,
-    //     clientSecret: paymentIntent.client_secret,
+    //     meetingLink,
+    //     // clientSecret: paymentIntent.client_secret,
     //     amount,
-    //     paymentIntentId: paymentIntent.id,
+    //     // paymentIntentId: paymentIntent.id,
     //   },
     // });
   } catch (error) {
