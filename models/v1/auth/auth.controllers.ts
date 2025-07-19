@@ -6,7 +6,9 @@ import { AuthenticatedRequest } from "../../../middleware/verifyUsers";
 import fs from "fs";
 import path from "path";
 import { v4 as uuidv4 } from "uuid";
+import bcrypt from "bcryptjs";
 import { baseUrl, getImageUrl } from "../../../utils/base_utl";
+import { generateOTP, sendVerificationOTP } from "../../../utils/emailService.utils";
 
 dotenv.config();
 
@@ -580,7 +582,6 @@ export const fordev = async (req: Request, res: Response) => {
   }
 };
 
-
 export const fordevSignup = async (req: Request, res: Response) => {
   try {
     const { name, email } = req.body;
@@ -645,6 +646,149 @@ export const fordevSignup = async (req: Request, res: Response) => {
     });
   }
 };
+
+// ------------------------------------------------------------------------------------
+
+// ------------------------------------------------------------------------------------
+// admin login
+export const adminLogin = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { email, password } = req.body;
+
+    // check if email and password are provided
+    if (!email || !password) {
+      res.status(400).json({ success: false, message: "Email and password are required" });
+      return;
+    }
+
+    // check if email and password are correct
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (!user) {
+      res.status(401).json({ success: false, message: "Invalid credentials" });
+      return;
+    }
+    // check if password is correct
+    // const isPasswordCorrect = await bcrypt.compare(password, user.password); 
+    const isPasswordCorrect = password === user.password;
+
+    if (!isPasswordCorrect) {
+      res.status(401).json({ success: false, message: "Invalid credentials" });
+      return;
+    }
+    // send verification email to admin
+    const otp = generateOTP();
+
+    await prisma.ucode.create({
+      data: {
+        userId: user.id,
+        otp: otp,
+        email: user.email,
+      },
+    });
+
+    await sendVerificationOTP(email, otp);
+  
+    res.status(200).json({
+        success: true,
+        message: "OTP sent successfully",
+    });
+    
+
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error instanceof Error ? error.message : "Internal server error",
+    });
+  }
+}
+
+// verification otp for admin login
+export const verifyOTP = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { email, otp } = req.body;
+
+    const userCode = await prisma.ucode.findFirst({ where: { email } });
+    if (!userCode) {
+      res.status(401).json({ success: false, message: "Invalid credentials" });
+      return;
+    }
+
+    if (userCode.otp !== otp) {
+      res.status(401).json({ success: false, message: "Invalid credentials" });
+      return;
+    }
+
+    const token = jwt.sign({
+      id: userCode.userId,
+    }, process.env.JWT_SECRET as string, { expiresIn: "7d" });
+
+    const user = await prisma.user.findUnique({ where: { id: userCode.userId } });
+    if (!user) {
+      res.status(401).json({ success: false, message: "Invalid credentials" });
+      return;
+    }
+
+    const {password:_, ...userWithoutPassword} = user;
+
+    res.status(200).json({
+      success: true,
+      message: "Login successfully",
+      token,
+      user: userWithoutPassword,
+    });
+
+
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error instanceof Error ? error.message : "Internal server error",
+    });
+  }
+}
+
+// resend verification otp for admin login
+export const resendOTP = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { email } = req.body;
+
+    const user = await prisma.user.findFirst({ where: { email } });
+    if (!user) {
+      res.status(401).json({ success: false, message: "Invalid credentials" });
+      return;
+    }
+    const otp = generateOTP();
+
+    // Check if an OTP already exists for the user
+    const existingUcode = await prisma.ucode.findFirst({ where: { userId: user.id } });
+
+    if (existingUcode) {
+      // Update the existing OTP record
+      await prisma.ucode.update({
+        where: { id: existingUcode.id },
+        data: {
+          otp: otp, 
+        },
+      });
+    } else {
+      // If no OTP record exists, create a new one
+      await prisma.ucode.create({
+        data: {
+          userId: user.id,
+          otp: otp,
+          email: user.email,
+        },
+      });
+    }
+
+    await sendVerificationOTP(email, otp);
+  
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error instanceof Error ? error.message : "Internal server error",
+    });
+  }
+}
 
 // import React from "react";
 

@@ -99,7 +99,7 @@ export const createBooking = async (req: AuthenticatedRequest, res: Response) =>
         status: "UPCOMING",
       },
     });
-    console.log("booking", booking)
+    // console.log("booking", booking)
 
     // Calculate platform fee (10%)
     const amountInCents = Math.round(amount * 100); // smallest currency unit
