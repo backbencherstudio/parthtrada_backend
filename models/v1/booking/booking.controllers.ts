@@ -30,13 +30,13 @@ export const createBooking = async (req: AuthenticatedRequest, res: Response) =>
       where: { userId: expertId },
       include: { user: true }
     });
-    // if (!expert?.stripeAccountId || !expert.isOnboardCompleted) {
-    //      res.status(400).json({
-    //         success: false,
-    //         message: "Expert has not completed payment setup",
-    //       });
-    //       return
-    //     }
+    if (!expert?.stripeAccountId || !expert.isOnboardCompleted) {
+      res.status(400).json({
+        success: false,
+        message: "Expert has not completed payment setup",
+      });
+      return;
+    }
         
     // get the student user details
     const student = await prisma.user.findUnique({
@@ -101,54 +101,52 @@ export const createBooking = async (req: AuthenticatedRequest, res: Response) =>
     });
     console.log("booking", booking)
 
-    // // Calculate platform fee (10%)
-    // const platformFee = Math.round(amount * 100 * 0.1);
-    // const amountInCents = Math.round(amount * 100);
+    // Calculate platform fee (10%)
+    const amountInCents = Math.round(amount * 100); // smallest currency unit
+    const platformFee = Math.round(amountInCents * 0.1);
 
-    // // Create Stripe PaymentIntent with Connect
-    // const paymentIntent = await stripe.paymentIntents.create({
-    //   amount: amountInCents,
-    //   currency: "usd",
-    //   application_fee_amount: platformFee,
-    //   transfer_data: {
-    //     destination: expert.stripeAccountId,
-    //   },
-    //   metadata: {
-    //     bookingId: booking.id,
-    //     studentId: userId!,
-    //     expertId,
-    //     meetingLink,
-    //   },
-    //   // Capture later after session completion
-    //   capture_method: "manual",
-    // });
+    // Create a PaymentIntent that transfers the funds directly to the expert’s account
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: amountInCents,
+      currency: "usd",
+      application_fee_amount: platformFee, // 10% platform fee
+      transfer_data: {
+        destination: expert.stripeAccountId!,
+      },
+      automatic_payment_methods: { enabled: true },
+      capture_method: "manual", // capture after session completion
+      metadata: {
+        bookingId: booking.id,
+        studentId: userId!,
+        expertId,
+        meetingLink,
+      },
+    });
 
+    // Record the transaction in the database
+    await prisma.transaction.create({
+      data: {
+        bookingId: booking.id,
+        amount,
+        currency: "usd",
+        provider: "STRIPE",
+        providerId: paymentIntent.id,
+        status: "PENDING",
+      },
+    });
 
-    // // console.log(paymentIntent)
-
-    // // Create transaction record
-    // await prisma.transaction.create({
-    //   data: {
-    //     bookingId: booking.id,
-    //     amount,
-    //     currency: "usd",
-    //     provider: "STRIPE",
-    //     providerId: paymentIntent.id,
-    //     status: "PENDING",
-    //   },
-    // });
-
-    // res.json({
-    //   success: true,
-    //   message: "Booking created successfully",
-    //   data: {
-    //     bookingId: booking.id,
-    //     meetingLink,
-    //     // clientSecret: paymentIntent.client_secret,
-    //     amount,
-    //     // paymentIntentId: paymentIntent.id,
-    //   },
-    // });
+    // Respond to the client with the PaymentIntent details so the student can complete payment
+    res.json({
+      success: true,
+      message: "Booking created successfully",
+      data: {
+        bookingId: booking.id,
+        meetingLink,
+        clientSecret: paymentIntent.client_secret,
+        amount,
+        paymentIntentId: paymentIntent.id,
+      },
+    });
   } catch (error) {
     console.error("Error creating booking:", error);
     res.status(500).json({
@@ -253,6 +251,27 @@ export const capturePayment = async (req: AuthenticatedRequest, res: Response) =
     // Capture the payment
     await stripe.paymentIntents.capture(booking.transaction?.providerId!);
 
+    // Instant payout to expert (90% net)
+    try {
+      const expertProfile = await prisma.expertProfile.findUnique({
+        where: { userId: booking.expertId },
+      });
+
+      if (expertProfile?.stripeAccountId) {
+        const netAmountInCents = Math.round(booking.transaction!.amount * 100 * 0.9);
+        await stripe.payouts.create(
+          {
+            amount: netAmountInCents,
+            currency: "usd",
+          },
+          { stripeAccount: expertProfile.stripeAccountId }
+        );
+      }
+    } catch (payoutErr) {
+      console.error("Instant payout failed", payoutErr);
+      // We don't fail the whole request if payout fails – funds stay in expert balance
+    }
+
     // Update transaction status
     await prisma.transaction.update({
       where: { bookingId },
@@ -261,7 +280,7 @@ export const capturePayment = async (req: AuthenticatedRequest, res: Response) =
 
     res.json({
       success: true,
-      message: "Payment captured successfully",
+      message: "Payment captured; payout instructed to expert (standard schedule)",
     });
   } catch (error) {
     console.error("Error capturing payment:", error);
@@ -291,10 +310,12 @@ export const initiateRefund = async (req: AuthenticatedRequest, res: Response) =
       return
     }
 
-    // Create refund
+    // Create refund (reverse transfer, refund platform fee as well)
     const refund = await stripe.refunds.create({
       payment_intent: booking.transaction?.providerId!,
-      reason: reason || "requested_by_customer"
+      reason: reason || "requested_by_customer",
+      reverse_transfer: true,
+      refund_application_fee: true,
     });
 
     // Update booking and transaction status

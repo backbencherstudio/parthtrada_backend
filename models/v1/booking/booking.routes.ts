@@ -21,8 +21,8 @@ router.post("/capture-payment", verifyUser("EXPERT"), capturePayment);
 router.post("/refund", verifyUser("ANY"), initiateRefund);
 
 // Stripe Connect routes
-router.post("/stripe/create-account", verifyUser("EXPERT"), createStripeAccount);
-router.get("/stripe/onboarding-link", verifyUser("EXPERT"), getOnboardingLink);
-router.get("/stripe/status", verifyUser("EXPERT"), checkOnboardingStatus);
+router.post("/stripe/create-account", verifyUser("ANY"), createStripeAccount);
+router.get("/stripe/onboarding-link", verifyUser("ANY"), getOnboardingLink);
+router.get("/stripe/status", verifyUser("ANY"), checkOnboardingStatus);
 
 export default router;
