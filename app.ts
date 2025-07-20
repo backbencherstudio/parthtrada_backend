@@ -6,6 +6,7 @@ import path from "path";
 import authRoutes from "./models/v1/auth/auth.routes";
 import booking from "./models/v1/booking/booking.routes";
 import chatRoutes from "./models/v1/chats/chats.routes";
+import adminRoutes from "./models/v1/admin-dashboard/admin.routes";
 
 const app = express();
 
@@ -34,6 +35,7 @@ app.use("/auth", authRoutes);
 app.use("/booking", booking);
 app.use("/chat", chatRoutes);
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+app.use("/admin", adminRoutes);
 
 app.use((req: Request, res: Response, next: NextFunction) => {
   res.status(404).json({

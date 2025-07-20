@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient, Role } from "@prisma/client";
 import jwt from "jsonwebtoken";
 import dotenv from "dotenv";
 import { AuthenticatedRequest } from "../../../middleware/verifyUsers";
@@ -678,17 +678,16 @@ export const adminLogin = async (req: Request, res: Response): Promise<void> => 
     // send verification email to admin
     const otp = generateOTP();
 
-    await prisma.ucode.create({
-      data: {
-        userId: user.id,
-        otp: otp,
-        email: user.email,
-      },
+    await prisma.ucode.upsert({
+      where: { userId: user.id },
+      update: { otp },
+      create: { userId: user.id, otp, email: user.email },
     });
 
     await sendVerificationOTP(email, otp);
   
     res.status(200).json({
+        otp,
         success: true,
         message: "OTP sent successfully",
     });
