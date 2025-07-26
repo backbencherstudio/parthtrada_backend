@@ -1,0 +1,129 @@
+import type { Response } from "express";
+import { Prisma, PrismaClient } from "@prisma/client";
+import Stripe from "stripe";
+import type { AuthenticatedRequest } from "../../../middleware/verifyUsers";
+import moment from 'moment-timezone'
+import { createZoomMeeting } from '../../../utils/zoom.utils'
+
+const prisma = new PrismaClient();
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
+
+
+
+export const getExperts = async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { search, page = '1', limit = '10', skills } = req.query;
+
+    const pageNum = parseInt(page as string, 10);
+    const limitNum = parseInt(limit as string, 10);
+    const skip = (pageNum - 1) * limitNum;
+
+    const where: Prisma.UserWhereInput = {
+      activeProfile: 'EXPERT',
+    };
+
+    const andConditions: Prisma.UserWhereInput[] = [];
+
+    if (search && (search as string).trim() !== '') {
+      const searchString = search as string;
+      andConditions.push({
+        name: { contains: searchString, mode: 'insensitive' }
+      });
+    }
+
+    if (skills) {
+      const skillsArray = (skills as string).split(',').map(s => s.trim()).filter(s => s);
+      if (skillsArray.length > 0) {
+        andConditions.push({
+          expertProfile: {
+            skills: {
+              hasSome: skillsArray,
+            },
+          },
+        });
+      }
+    }
+
+    if (andConditions.length > 0) {
+      where.AND = andConditions;
+    }
+
+    const experts = await prisma.user.findMany({
+      where,
+      include: {
+        expertProfile: true,
+      },
+      take: limitNum,
+      skip,
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+
+    const totalExperts = await prisma.user.count({ where });
+
+    res.status(200).json({
+      success: true,
+      message: "Experts fetched successfully",
+      data: experts,
+      meta: {
+        total: totalExperts,
+        page: pageNum,
+        limit: limitNum,
+        totalPages: Math.ceil(totalExperts / limitNum),
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching experts:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch experts",
+      error: error instanceof Error ? error.message : "Internal server error",
+    });
+  }
+};
+
+export const getExpertById = async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    if (!id) {
+      res.status(400).json({
+        success: false,
+        message: "Expert ID is required",
+      });
+      return;
+    }
+
+    const expert = await prisma.user.findUnique({
+      where: {
+        id,
+        activeProfile: 'EXPERT',
+      },
+      include: {
+        expertProfile: true,
+      },
+    });
+
+    if (!expert) {
+      res.status(404).json({
+        success: false,
+        message: "Expert not found",
+      });
+      return;
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Expert fetched successfully",
+      data: expert,
+    });
+  } catch (error) {
+    console.error("Error fetching expert by ID:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch expert",
+      error: error instanceof Error ? error.message : "Internal server error",
+    });
+  }
+};

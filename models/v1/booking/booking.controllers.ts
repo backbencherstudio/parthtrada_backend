@@ -10,7 +10,7 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
 
 
-export const createBooking = async (req: AuthenticatedRequest, res: Response) => {
+export const  createBooking = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const userId = req.user?.id;
     // console.log(userId)
