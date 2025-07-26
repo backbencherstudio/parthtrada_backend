@@ -27,7 +27,7 @@ const fetchAccessToken = async (code: string) => {
     code,
     client_id: LINKEDIN_CONFIG.clientId,
     client_secret: LINKEDIN_CONFIG.clientSecret,
-    redirect_uri: LINKEDIN_CONFIG.redirectUri,
+    redirect_uri: LINKEDIN_CONFIG.redirectUri,                
   });
 
   const response = await fetch(LINKEDIN_CONFIG.tokenEndpoint, {
