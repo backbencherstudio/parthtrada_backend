@@ -231,6 +231,9 @@ export const createMeetingLink = async (req: AuthenticatedRequest, res: Response
       });
       return;
     }
+
+    // todo: send notification to the student that the meeting link is created
+    
     // update the booking with the meeting link
     const updatedBooking = await prisma.booking.update({
       where: { id: bookingId },
