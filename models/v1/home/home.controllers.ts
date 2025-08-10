@@ -127,3 +127,42 @@ export const getExpertById = async (req: AuthenticatedRequest, res: Response) =>
     });
   }
 };
+
+export const getSchedule = async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const userId = req.user?.id;
+    const { status } = req.query;
+
+    if (!userId) {
+      res.status(401).json({
+        success: false,
+        message: "User not authenticated",
+      });
+      return;
+    }
+
+
+    const bookings = await prisma.booking.findMany({
+      where: {
+        studentId: userId,
+      },
+      orderBy: {
+        date: 'desc',
+      },
+    });
+
+
+    res.status(200).json({
+      success: true,
+      message: "Schedule fetched successfully",
+      data: bookings
+    });
+  } catch (error) {
+    console.error("Error fetching schedule:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch schedule",
+      error: error instanceof Error ? error.message : "Internal server error",
+    });
+  }
+};
