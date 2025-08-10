@@ -35,6 +35,7 @@ model User {
   studentReviews Review[]       @relation("StudentReview")
   expertReviews  Review[]       @relation("ExpertReview")
   notifications  Notification[]
+  transactions   Transaction[] @relation("Transactions")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -120,21 +121,44 @@ model Booking {
 }
 
 model Transaction {
-  id         String            @id @default(cuid())
-  bookingId  String?           @unique
-  amount     Float
-  currency   String
-  provider   PaymentProvider
-  providerId String
-  status     TransactionStatus
+  id               String      @id @default(cuid())
+  createdAt        DateTime    @default(now())      @map("created_at")
+  updatedAt        DateTime    @updatedAt           @map("updated_at")
+  deletedAt        DateTime?   @map("deleted_at")
+  
 
-  refundDate   DateTime?
-  refundReason String?
+  // Relations
+  bookingId        String?     @unique
+  booking          Booking?    @relation(fields: [bookingId], references: [id], onDelete: SetNull)
 
-  booking   Booking? @relation(fields: [bookingId], references: [id], onDelete: SetNull)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  storeId          String?     @map("store_id")
+  userId           String?     @map("user_id")
+  user             User?       @relation("Transactions", fields: [userId], references: [id])
+
+  orderId          String?     @map("order_id")
+  type             String?     @default("order")
+  withdrawVia      WithdrawalMethod? @default(WALLET) @map("withdraw_via")
+
+  // Payment details
+  provider         String?
+  providerId       String?
+  referenceNumber  String?     @map("reference_number")
+  rawStatus        String?     @map("raw_status")
+  status           PaymentStatus? @default(PENDING)
+
+  // Amount & currency
+  amount           Decimal?
+  currency         String?
+  paidAmount       Decimal?    @map("paid_amount")
+  paidCurrency     String?     @map("paid_currency")
+
+  // Refund info
+  refundDate       DateTime?
+  refundReason     String?
+
+  @@map("transactions")
 }
+
 
 model Review {
   id          String  @id @default(cuid())
@@ -217,11 +241,19 @@ enum PaymentProvider {
   PAYPAL
 }
 
-enum TransactionStatus {
+
+enum PaymentStatus {
   PENDING
-  SUCCESS
+  COMPLETED
   FAILED
+  CANCELED
   REFUNDED
+}
+
+enum WithdrawalMethod {
+  WALLET
+  BANK
+  STRIPE
 }
 
 enum Role {
