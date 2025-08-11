@@ -62,28 +62,27 @@ export const  createBooking = async (req: AuthenticatedRequest, res: Response) =
 
     // console.log(`Expert Time (${expertTimeZone}):`, formattedExpertTime);
     // console.log(`Student Time (${studentTimeZone}):`, formattedStudentTime);
-
     // 1️⃣ Create Zoom meeting scheduled in expert's timezone
-    let meetingLink: string | undefined;
-    try {
-      const zoomMeeting = await createZoomMeeting({
-        topic: `Session with ${student?.name ?? 'Student'}`,
-        startTime: expertMoment.toDate(),
-        duration: sessionDuration, // expecting minutes
-        agenda: typeof sessionDetails === 'string' ? sessionDetails : undefined,
-        timezone: expertTimeZone,
-      });
-      // console.log("meetingLink", zoomMeeting)
-      meetingLink = zoomMeeting.join_url;
-    } catch (zoomErr) {
-      // console.error('Failed to create Zoom meeting', zoomErr);
-      // If Zoom creation fails, we can choose to proceed without it or abort. Here we abort.
-      res.status(500).json({
-        success: false,
-        message: 'Failed to create Zoom meeting',
-      });
-      return;
-    }
+    // let meetingLink: string | undefined;
+    // try {
+    //   const zoomMeeting = await createZoomMeeting({
+    //     topic: `Session with ${student?.name ?? 'Student'}`,
+    //     startTime: expertMoment.toDate(),
+    //     duration: sessionDuration, // expecting minutes
+    //     agenda: typeof sessionDetails === 'string' ? sessionDetails : undefined,
+    //     timezone: expertTimeZone,
+    //   });
+    //   // console.log("meetingLink", zoomMeeting)
+    //   meetingLink = zoomMeeting.join_url;
+    // } catch (zoomErr) {
+    //   // console.error('Failed to create Zoom meeting', zoomErr);
+    //   // If Zoom creation fails, we can choose to proceed without it or abort. Here we abort.
+    //   res.status(500).json({
+    //     success: false,
+    //     message: 'Failed to create Zoom meeting',
+    //   });
+    //   return;
+    // }
 
     // // Create booking record
     const booking = await prisma.booking.create({
@@ -93,10 +92,8 @@ export const  createBooking = async (req: AuthenticatedRequest, res: Response) =
         date: expertMoment.toDate(),
         expertDateTime: expertMoment.toDate(),
         studentDateTime: studentMoment.toDate(),
-        meetingLink,
         sessionDuration,
-        sessionDetails,
-        status: "UPCOMING",
+        sessionDetails, // Will represent PENDING until enum is fixed
       },
     });
     // console.log("booking", booking)
@@ -119,7 +116,7 @@ export const  createBooking = async (req: AuthenticatedRequest, res: Response) =
         bookingId: booking.id,
         studentId: userId!,
         expertId,
-        meetingLink,
+        // meetingLink,
       },
     });
 
@@ -138,13 +135,12 @@ export const  createBooking = async (req: AuthenticatedRequest, res: Response) =
     // Respond to the client with the PaymentIntent details so the student can complete payment
     res.json({
       success: true,
-      message: "Booking created successfully",
+      message: "Booking Request sent successfully",
       data: {
         bookingId: booking.id,
-        meetingLink,
-        clientSecret: paymentIntent.client_secret,
-        amount,
-        paymentIntentId: paymentIntent.id,
+        // clientSecret: paymentIntent.client_secret,
+        amount,          
+        // paymentIntentId: paymentIntent.id, 
       },
     });
   } catch (error) {
