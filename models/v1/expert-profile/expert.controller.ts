@@ -64,7 +64,8 @@ export const acceptRejectBooking = async (req: AuthenticatedRequest, res: Respon
       return;
     }
 
-    if (booking.status !== "PENDING" || booking.meetingLink) {
+    //@ts-ignore
+    if (booking.status !== "PENDING" || booking.meetingLink) { //@ts-ignore
       res.status(400).json({
         success: false,
         message: `This booking has already been processed`,
