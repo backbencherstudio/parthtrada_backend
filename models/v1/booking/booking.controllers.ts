@@ -1,7 +1,7 @@
 import type { Response } from "express";
 import { PrismaClient } from "@prisma/client";
 import Stripe from "stripe";
-import type { AuthenticatedRequest } from "../../../middleware/verifyUsers";
+import type { AuthenticatedRequest } from "@/middleware/verifyUsers";
 import moment from 'moment-timezone'
 import { createZoomMeeting } from '../../../utils/zoom.utils'
 
@@ -92,7 +92,6 @@ export const withdrawTransaction = async (req: AuthenticatedRequest, res: Respon
           id: transactionId,
         },
         data: {
-          //@ts-ignore
           status: 'COMPLETED',
         },
       });
@@ -295,15 +294,20 @@ export const createBooking = async (req: AuthenticatedRequest, res: Response) =>
 
 export const confirmPayment = async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { paymentIntentId } = req.body;
+    const { paymentIntentId, paymentMethodId } = req.body;
     const userId = req.user?.id;
 
     if (!paymentIntentId) {
-      res.status(400).json({
+      return res.status(400).json({
         success: false,
         message: "Payment intent ID required",
       });
-      return
+    }
+    if (!paymentMethodId) {
+      return res.status(400).json({
+        success: false,
+        message: "Payment Method ID required",
+      });
     }
 
     // Verify the booking belongs to this user
@@ -330,33 +334,41 @@ export const confirmPayment = async (req: AuthenticatedRequest, res: Response) =
       return
     }
 
-    // Capture the payment (only if session is completed)
+    let newStatus = transaction.status;
+    // Capture the payment
     if (transaction.booking.status === "PENDING") {
       try {
-        const stripeRes = await stripe.paymentIntents.capture(paymentIntentId);
-        console.log('========stripe res============================');
-        console.log(stripeRes);
-        console.log('====================================');
+        const paymentMethod = await prisma.paymentMethod.findFirst({where: {stripePaymentMethodId: paymentMethodId}})
+        const paymentIntent = await stripe.paymentIntents.create({
+          amount: Number(transaction.amount) * 100, // in cents
+          currency: "usd",
+          capture_method: "manual",
+          payment_method: paymentMethodId,
+          confirm: true,
+          customer: paymentMethod.customerID,
+          automatic_payment_methods: {enabled: true},
+          return_url: process.env.FRONTEND_URL
+        });
+
+
+        await stripe.paymentIntents.capture(paymentIntent.id);
+        newStatus = "COMPLETED";
       } catch (error) {
-        console.log('======stripe error==============================');
-        console.log(error);
-        console.log('====================================');
-        // throw Error()
+        throw new Error('Payment processing failed'); 
       }
     }
 
-    // // Update transaction status
-    // const updatedTransaction = await prisma.transaction.update({
-    //   where: { id: transaction.id },
-    //   data: { status: "COMPLETED" },
-    //   include: { booking: true }
-    // });
+    // Update transaction status
+    const updatedTransaction = await prisma.transaction.update({
+      where: { id: transaction.id },
+      data: { status: newStatus },
+      include: { booking: true }
+    });
 
     res.json({
       success: true,
       message: "Payment confirmed successfully",
-      transaction
-      // transaction: updatedTransaction,
+      transaction: updatedTransaction,
     });
   } catch (error) {
     console.error("Error confirming payment:", error);
@@ -508,5 +520,5 @@ export const setupIntent = async () => {
     payment_method_types: ["card"],
   });
 
-  return {clientSecret: setupIntent.client_secret, customerId: customer.id}
+  return { clientSecret: setupIntent.client_secret, customerId: customer.id }
 }

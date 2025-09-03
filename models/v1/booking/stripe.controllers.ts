@@ -1,7 +1,7 @@
-import { Request, Response } from "express";
+import { Response } from "express";
 import { PrismaClient } from "@prisma/client";
 import Stripe from "stripe";
-import { AuthenticatedRequest } from "../../../middleware/verifyUsers";
+import type { AuthenticatedRequest } from "@/middleware/verifyUsers";
 
 const prisma = new PrismaClient();
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
@@ -42,25 +42,16 @@ export const createStripeAccount = async (
       },
     });
 
-    const accountLink = await stripe.accountLinks.create({
-      account: account.id,
-      refresh_url: "https://example.com/reauth",
-      return_url: "https://example.com/return",
-      type: "account_onboarding",
-    });
-
-
     // Update expert with Stripe account ID
     await prisma.expertProfile.update({
       where: { userId },
       data: { stripeAccountId: account.id },
     });
 
-    res.json({
+    return res.json({
       success: true,
       message: "Stripe account created",
       accountId: account.id,
-      redirectURL: accountLink.url
     });
   } catch (error) {
     console.error("Error creating Stripe account:", error);

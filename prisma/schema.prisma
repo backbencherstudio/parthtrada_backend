@@ -231,6 +231,7 @@ model PaymentMethod {
   id String @id @default(cuid())
 
   stripePaymentMethodId String @unique
+  customerID            String @unique
 
   brand    String?
   last4    String?
