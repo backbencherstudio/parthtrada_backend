@@ -7,7 +7,7 @@ import { createZoomMeeting } from '../../../utils/zoom.utils'
 
 const prisma = new PrismaClient();
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2025-05-28.basil',
+  apiVersion: '2025-08-27.basil',
 });
 
 
@@ -63,7 +63,7 @@ export const withdrawTransaction = async (req: AuthenticatedRequest, res: Respon
     if (withdrawVia === 'STRIPE') {
       // Step 1: Process withdrawal to Stripe
       const payout = await stripe.payouts.create({
-        amount: transaction.amount * 100, // Convert to cents
+        amount: Number(transaction.amount) * 100, // Convert to cents
         currency: 'usd',
         destination: transaction.providerId, // Expert's Stripe account ID
       });
@@ -337,7 +337,7 @@ export const confirmPayment = async (req: AuthenticatedRequest, res: Response) =
     // Update transaction status
     const updatedTransaction = await prisma.transaction.update({
       where: { id: transaction.id },
-      data: { status: "SUCCESS" },
+      data: { status: "COMPLETED" },
       include: { booking: true }
     });
 
@@ -393,7 +393,7 @@ export const capturePayment = async (req: AuthenticatedRequest, res: Response) =
       });
 
       if (expertProfile?.stripeAccountId) {
-        const netAmountInCents = Math.round(booking.transaction!.amount * 100 * 0.9);
+        const netAmountInCents = Math.round(Number(booking.transaction!.amount) * 100 * 0.9);
         await stripe.payouts.create(
           {
             amount: netAmountInCents,
@@ -410,7 +410,7 @@ export const capturePayment = async (req: AuthenticatedRequest, res: Response) =
     // Update transaction status
     await prisma.transaction.update({
       where: { bookingId },
-      data: { status: "SUCCESS" }
+      data: { status: "COMPLETED" }
     });
 
     res.json({
