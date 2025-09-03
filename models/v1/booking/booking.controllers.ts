@@ -279,7 +279,7 @@ export const  createBooking = async (req: AuthenticatedRequest, res: Response) =
         bookingId: booking.id,
         // clientSecret: paymentIntent.client_secret,
         amount,          
-        // paymentIntentId: paymentIntent.id, 
+        paymentIntentId: paymentIntent.id, 
       },
     });
   } catch (error) {
@@ -330,21 +330,32 @@ export const confirmPayment = async (req: AuthenticatedRequest, res: Response) =
     }
 
     // Capture the payment (only if session is completed)
-    if (transaction.booking.status === "COMPLETED") {
-      await stripe.paymentIntents.capture(paymentIntentId);
+    if (transaction.booking.status === "PENDING") {
+      try {
+        const stripeRes = await stripe.paymentIntents.capture(paymentIntentId);
+        console.log('========stripe res============================');
+        console.log(stripeRes);
+        console.log('====================================');
+      } catch (error) {
+        console.log('======stripe error==============================');
+        console.log(error);
+        console.log('====================================');
+        // throw Error()
+      }
     }
 
-    // Update transaction status
-    const updatedTransaction = await prisma.transaction.update({
-      where: { id: transaction.id },
-      data: { status: "COMPLETED" },
-      include: { booking: true }
-    });
+    // // Update transaction status
+    // const updatedTransaction = await prisma.transaction.update({
+    //   where: { id: transaction.id },
+    //   data: { status: "COMPLETED" },
+    //   include: { booking: true }
+    // });
 
     res.json({
       success: true,
       message: "Payment confirmed successfully",
-      transaction: updatedTransaction,
+      transaction
+      // transaction: updatedTransaction,
     });
   } catch (error) {
     console.error("Error confirming payment:", error);

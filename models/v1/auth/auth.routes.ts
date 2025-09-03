@@ -9,8 +9,8 @@ const router = Router();
 
 router.get('/linkedin/callback', linkedinCallback);
 
-router.post('/fotdev-login', fordev)
-router.post('/fordev-signup', fordevSignup); 
+router.post('/for-dev-login', fordev)
+router.post('/for-dev-signup', fordevSignup); 
 
 router.put('/update', verifyUser('ANY'), upload.single("image"),  updateUser);
 

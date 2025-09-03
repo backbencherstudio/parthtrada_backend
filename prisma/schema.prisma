@@ -35,10 +35,11 @@ model User {
   studentReviews Review[]       @relation("StudentReview")
   expertReviews  Review[]       @relation("ExpertReview")
   notifications  Notification[]
-  transactions   Transaction[] @relation("Transactions")
+  transactions   Transaction[]  @relation("Transactions")
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  PaymentMethod PaymentMethod[]
 }
 
 model Ucode {
@@ -49,7 +50,7 @@ model Ucode {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  otp String?
+  otp   String?
   email String?
 
   userId String @unique
@@ -93,11 +94,11 @@ model ExpertProfile {
 }
 
 model Booking {
-  id              String        @id @default(cuid())
-  studentId       String?
-  expertId        String?
-  date            DateTime
-  
+  id        String   @id @default(cuid())
+  studentId String?
+  expertId  String?
+  date      DateTime
+
   expertDateTime  DateTime
   studentDateTime DateTime
 
@@ -121,44 +122,42 @@ model Booking {
 }
 
 model Transaction {
-  id               String      @id @default(cuid())
-  createdAt        DateTime    @default(now())      @map("created_at")
-  updatedAt        DateTime    @updatedAt           @map("updated_at")
-  deletedAt        DateTime?   @map("deleted_at")
-  
+  id        String    @id @default(cuid())
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
 
   // Relations
-  bookingId        String?     @unique
-  booking          Booking?    @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+  bookingId String?  @unique
+  booking   Booking? @relation(fields: [bookingId], references: [id], onDelete: SetNull)
 
-  storeId          String?     @map("store_id")
-  userId           String?     @map("user_id")
-  user             User?       @relation("Transactions", fields: [userId], references: [id])
+  storeId String? @map("store_id")
+  userId  String? @map("user_id")
+  user    User?   @relation("Transactions", fields: [userId], references: [id])
 
-  orderId          String?     @map("order_id")
-  type             String?     @default("order")
-  withdrawVia      WithdrawalMethod? @default(WALLET) @map("withdraw_via")
+  orderId     String?           @map("order_id")
+  type        String?           @default("order")
+  withdrawVia WithdrawalMethod? @default(WALLET) @map("withdraw_via")
 
   // Payment details
-  provider         String?
-  providerId       String?
-  referenceNumber  String?     @map("reference_number")
-  rawStatus        String?     @map("raw_status")
-  status           PaymentStatus? @default(PENDING)
+  provider        String?
+  providerId      String?
+  referenceNumber String?        @map("reference_number")
+  rawStatus       String?        @map("raw_status")
+  status          PaymentStatus? @default(PENDING)
 
   // Amount & currency
-  amount           Decimal?
-  currency         String?
-  paidAmount       Decimal?    @map("paid_amount")
-  paidCurrency     String?     @map("paid_currency")
+  amount       Decimal?
+  currency     String?
+  paidAmount   Decimal? @map("paid_amount")
+  paidCurrency String?  @map("paid_currency")
 
   // Refund info
-  refundDate       DateTime?
-  refundReason     String?
+  refundDate   DateTime?
+  refundReason String?
 
   @@map("transactions")
 }
-
 
 model Review {
   id          String  @id @default(cuid())
@@ -228,6 +227,19 @@ model Message {
   createdAt DateTime @default(now())
 }
 
+model PaymentMethod {
+  id String @id @default(cuid())
+
+  stripePaymentMethodId String @unique
+
+  brand    String?
+  last4    String?
+  expMonth Int?
+  expYear  Int?
+  user     User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId   String
+}
+
 enum BookingStatus {
   PENDING
   UPCOMING
@@ -240,7 +252,6 @@ enum PaymentProvider {
   STRIPE
   PAYPAL
 }
-
 
 enum PaymentStatus {
   PENDING

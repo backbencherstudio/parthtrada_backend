@@ -42,6 +42,14 @@ export const createStripeAccount = async (
       },
     });
 
+    const accountLink = await stripe.accountLinks.create({
+      account: account.id,
+      refresh_url: "https://example.com/reauth",
+      return_url: "https://example.com/return",
+      type: "account_onboarding",
+    });
+
+
     // Update expert with Stripe account ID
     await prisma.expertProfile.update({
       where: { userId },
@@ -52,6 +60,7 @@ export const createStripeAccount = async (
       success: true,
       message: "Stripe account created",
       accountId: account.id,
+      redirectURL: accountLink.url
     });
   } catch (error) {
     console.error("Error creating Stripe account:", error);
