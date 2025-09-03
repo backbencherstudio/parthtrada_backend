@@ -9,6 +9,7 @@ import chatRoutes from "./models/v1/chats/chats.routes";
 import adminRoutes from "./models/v1/admin-dashboard/admin.routes";
 import homeRoutes from "./models/v1/home/home.routes";
 import expertRoutes from "./models/v1/expert-profile/expert.routes";
+import paymentRoutes from "./models/v1/payment/payment.routes";
 
 const app = express();
 
@@ -40,6 +41,7 @@ app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 app.use("/admin", adminRoutes);
 app.use("/home", homeRoutes);
 app.use("/expert", expertRoutes);
+app.use("/payment", paymentRoutes);
 
 app.use((req: Request, res: Response, next: NextFunction) => {
   res.status(404).json({

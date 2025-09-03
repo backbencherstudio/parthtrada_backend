@@ -1,19 +1,20 @@
 import { Request, Response } from "express";
-import { PrismaClient, TransactionStatus } from "@prisma/client";
+// import { PrismaClient, TransactionStatus } from "@prisma/client";
+import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
 export const dashboard = async (req: Request, res: Response): Promise<void> => {
   try {
-    const [totalUsers, studentCount, expertCount, totalSessions, txAgg] = await Promise.all([
+    const [totalUsers, studentCount, expertCount, totalSessions,] = await Promise.all([
       prisma.user.count(),
       prisma.user.count({ where: { activeProfile: "STUDENT" } }),
       prisma.user.count({ where: { activeProfile: "EXPERT" } }),
       prisma.booking.count(),
-      prisma.transaction.aggregate({
-        where: { status: TransactionStatus.SUCCESS },
-        _sum: { amount: true },
-      }),
+      // prisma.transaction.aggregate({
+      //   where: { status: TransactionStatus.SUCCESS },
+      //   _sum: { amount: true },
+      // }),
     ]);
 
     // percentage calculation
@@ -121,7 +122,7 @@ export const dashboard = async (req: Request, res: Response): Promise<void> => {
           totalUsers,
           totalExperts: expertCount,
           totalSessions,
-          totalTransactions: txAgg._sum.amount ?? 0,
+          // totalTransactions: txAgg._sum.amount ?? 0,
         },
         userRole: {
           students: { count: studentCount, percent: studentPercent },

@@ -1,8 +1,8 @@
 import { Router } from 'express';
 import { linkedinCallback, updateUser, beExpart, beStudent, fordev, fordevSignup, adminLogin, verifyOTP, resendOTP } from './auth.controllers';
-import { verifyUser } from '../../../middleware/verifyUsers';
-import upload from "../../../config/multer.config";
-import { verifyAdmin } from '../../../middleware/verifyAdmin';
+import { verifyUser } from '@/middleware/verifyUsers';
+import upload from '@/config/multer.config';
+import { verifyAdmin } from '@/middleware/verifyAdmin';
 
 const router = Router();
 
