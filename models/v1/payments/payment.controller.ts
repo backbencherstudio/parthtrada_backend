@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 
-export const createPayment = async (req: Request, res: Response) =>{
+export const savePaymentMethod = async (req: Request, res: Response) =>{
     try {
         return res.status(201).json({
             message: 'Created'

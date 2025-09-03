@@ -9,7 +9,8 @@ import chatRoutes from "./models/v1/chats/chats.routes";
 import adminRoutes from "./models/v1/admin-dashboard/admin.routes";
 import homeRoutes from "./models/v1/home/home.routes";
 import expertRoutes from "./models/v1/expert-profile/expert.routes";
-import paymentRoutes from "./models/v1/payment/payment.routes";
+import paymentRoutes from "./models/v1/payments/payment.routes";
+import { setupIntent } from "./models/v1/booking/booking.controllers";
 
 const app = express();
 
@@ -41,7 +42,27 @@ app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 app.use("/admin", adminRoutes);
 app.use("/home", homeRoutes);
 app.use("/expert", expertRoutes);
-app.use("/payment", paymentRoutes);
+app.use("/payments", paymentRoutes);
+
+
+// For testing add ejs
+app.set("view engine", "ejs");
+app.set("views", path.join(__dirname, "views"));
+
+app.get("/add-card", async (req, res) => {
+  try {
+    const intent = await setupIntent()
+
+    res.render("index", {
+      publishableKey: 'pk_test_51S39GcLenvrEQJkbVfvGzHLbGEVeTgpoJFGv6ZMw5vvai6r2HQrusGhuSRaBASSDlUc9Y1R293qKduPfhqPKwtEw00PRFjI7Xa',
+      clientSecret: intent.clientSecret,
+      customerId: intent.customerId
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Failed to create SetupIntent");
+  }
+});
 
 app.use((req: Request, res: Response, next: NextFunction) => {
   res.status(404).json({

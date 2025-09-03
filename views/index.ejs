@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Add a payment card</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 640px; margin: 40px auto; padding: 0 16px; }
+    .card { border: 1px solid #e5e7eb; border-radius: 12px; padding: 24px; }
+    .row { margin: 12px 0; }
+    #card-element { padding: 12px; border: 1px solid #e5e7eb; border-radius: 8px; }
+    button { padding: 10px 16px; border-radius: 8px; border: 0; cursor: pointer; }
+    button:disabled { opacity: 0.6; cursor: not-allowed; }
+    .success { color: #059669; }
+    .error { color: #dc2626; }
+  </style>
+  <script src="https://js.stripe.com/v3/"></script>
+</head>
+<body>
+  <h1>Add a payment method</h1>
+  <p>Use a Stripe test card like <strong>4242 4242 4242 4242</strong>, any future date, any CVC.</p>
+
+  <div class="card">
+    <form id="add-card-form">
+      <div class="row">
+        <label for="card-element">Card details</label>
+        <div id="card-element"></div>
+      </div>
+      <div class="row">
+        <button id="submit" type="submit">Save card</button>
+      </div>
+      <div class="row">
+        <div id="message" role="status" aria-live="polite"></div>
+      </div>
+    </form>
+  </div>
+
+  <script>
+    // Injected by server render
+    const STRIPE_PUBLISHABLE_KEY = "<%= publishableKey %>";
+    const SETUP_INTENT_CLIENT_SECRET = "<%= clientSecret %>";
+
+    const stripe = Stripe(STRIPE_PUBLISHABLE_KEY);
+    const elements = stripe.elements();
+    const cardElement = elements.create("card");
+    cardElement.mount("#card-element");
+
+    const form = document.getElementById("add-card-form");
+    const submit = document.getElementById("submit");
+    const message = document.getElementById("message");
+
+    function setStatus(text, cls) {
+      message.textContent = text || "";
+      message.className = cls || "";
+    }
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      submit.disabled = true;
+      setStatus("Saving card...", "");
+
+      try {
+        const { setupIntent, error } = await stripe.confirmCardSetup(
+          SETUP_INTENT_CLIENT_SECRET,
+          {
+            payment_method: {
+              card: cardElement,
+            },
+          }
+        );
+
+        if (error) {
+          setStatus(error.message, "error");
+          submit.disabled = false;
+          return;
+        }
+
+        // Send the saved payment method ID to your backend to attach/persist
+        const resp = await fetch("/payments/save-payment-method", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            paymentMethodId: setupIntent.payment_method,
+            customerId: "<%= customerId %>",
+            setupIntent
+          }),
+        });
+
+        const data = await resp.json();
+        if (!resp.ok || !data.success) {
+          throw new Error(data.message || "Failed to save payment method");
+        }
+
+        setStatus("Card saved successfully ✅", "success");
+      } catch (err) {
+        setStatus(err.message || "Something went wrong", "error");
+      } finally {
+        submit.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>

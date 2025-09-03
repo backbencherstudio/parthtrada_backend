@@ -6,6 +6,7 @@ import moment from 'moment-timezone'
 import { createZoomMeeting } from '../../../utils/zoom.utils'
 
 const prisma = new PrismaClient();
+
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2025-08-27.basil',
 });
@@ -28,7 +29,7 @@ export const createTransaction = async (req: AuthenticatedRequest, res: Response
     const transaction = await prisma.transaction.create({
       data: {
         //@ts-ignore
-        userId: userId!, 
+        userId: userId!,
         storeId: expertId,
         amount,
         currency: 'USD',
@@ -92,7 +93,7 @@ export const withdrawTransaction = async (req: AuthenticatedRequest, res: Respon
         },
         data: {
           //@ts-ignore
-          status: 'COMPLETED', 
+          status: 'COMPLETED',
         },
       });
 
@@ -120,7 +121,7 @@ export const refundTransaction = async (req: AuthenticatedRequest, res: Response
     }
 
     // Step 1: Process refund via Stripe if the transaction is made via Stripe
-    if (transaction.provider === 'STRIPE' && transaction.providerId) {   
+    if (transaction.provider === 'STRIPE' && transaction.providerId) {
       const refund = await stripe.refunds.create({
         payment_intent: transaction.providerId,
       });
@@ -149,7 +150,7 @@ export const refundTransaction = async (req: AuthenticatedRequest, res: Response
 
 
 
-export const  createBooking = async (req: AuthenticatedRequest, res: Response) => {
+export const createBooking = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const userId = req.user?.id;
     // console.log(userId)
@@ -176,13 +177,13 @@ export const  createBooking = async (req: AuthenticatedRequest, res: Response) =
       });
       return;
     }
-        
+
     // get the student user details
     const student = await prisma.user.findUnique({
-        where: { id: userId },
+      where: { id: userId },
     });
-        
-     // Combine date and time to create a complete datetime string
+
+    // Combine date and time to create a complete datetime string
     const expertDateTime = `${date} ${time}`;
 
     // Fetch time-zone strings from the user records (should be valid IANA tz names)
@@ -278,8 +279,8 @@ export const  createBooking = async (req: AuthenticatedRequest, res: Response) =
       data: {
         bookingId: booking.id,
         // clientSecret: paymentIntent.client_secret,
-        amount,          
-        paymentIntentId: paymentIntent.id, 
+        amount,
+        paymentIntentId: paymentIntent.id,
       },
     });
   } catch (error) {
@@ -298,7 +299,7 @@ export const confirmPayment = async (req: AuthenticatedRequest, res: Response) =
     const userId = req.user?.id;
 
     if (!paymentIntentId) {
-       res.status(400).json({
+      res.status(400).json({
         success: false,
         message: "Payment intent ID required",
       });
@@ -322,7 +323,7 @@ export const confirmPayment = async (req: AuthenticatedRequest, res: Response) =
     });
 
     if (!transaction) {
-       res.status(404).json({
+      res.status(404).json({
         success: false,
         message: "Transaction not found or unauthorized",
       });
@@ -379,7 +380,7 @@ export const capturePayment = async (req: AuthenticatedRequest, res: Response) =
     });
 
     if (!booking || booking.expertId !== userId) {
-       res.status(403).json({
+      res.status(403).json({
         success: false,
         message: "Unauthorized or booking not found",
       });
@@ -387,7 +388,7 @@ export const capturePayment = async (req: AuthenticatedRequest, res: Response) =
     }
 
     if (booking.status !== "COMPLETED") {
-       res.status(400).json({
+      res.status(400).json({
         success: false,
         message: "Session must be completed before capturing payment",
       });
@@ -449,7 +450,7 @@ export const initiateRefund = async (req: AuthenticatedRequest, res: Response) =
     });
 
     if (!booking || (booking.studentId !== userId && booking.expertId !== userId)) {
-       res.status(403).json({
+      res.status(403).json({
         success: false,
         message: "Unauthorized or booking not found",
       });
@@ -472,7 +473,7 @@ export const initiateRefund = async (req: AuthenticatedRequest, res: Response) =
       }),
       prisma.transaction.update({
         where: { bookingId },
-        data: { 
+        data: {
           status: "REFUNDED",
           refundDate: new Date(),
           refundReason: reason
@@ -494,3 +495,18 @@ export const initiateRefund = async (req: AuthenticatedRequest, res: Response) =
     });
   }
 };
+
+export const setupIntent = async () => {
+
+  const customer = await stripe.customers.create({
+    email: "john@example.com",
+    name: "John Doe",
+  });
+
+  const setupIntent = await stripe.setupIntents.create({
+    customer: customer.id,
+    payment_method_types: ["card"],
+  });
+
+  return {clientSecret: setupIntent.client_secret, customerId: customer.id}
+}
