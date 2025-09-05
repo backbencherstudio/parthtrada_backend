@@ -3,6 +3,7 @@ import { PrismaClient } from "@prisma/client";
 import Stripe from "stripe";
 import type { AuthenticatedRequest } from "@/middleware/verifyUsers";
 import moment from 'moment-timezone'
+import { createZoomMeeting } from "@/utils/zoom.utils";
 
 const prisma = new PrismaClient();
 
@@ -56,6 +57,27 @@ export const createBooking = async (req: AuthenticatedRequest, res: Response) =>
     // Convert the moment to the student's time zone
     const studentMoment = expertMoment.clone().tz(studentTimeZone);
 
+    // generate zoom meeting
+    let meetingLink: string | undefined;
+    try {
+      const zoomMeeting = await createZoomMeeting({
+        topic: `Session with ${student?.name ?? 'Student'}`,
+        startTime: expertMoment.toDate(),
+        duration: sessionDuration, // expecting minutes
+        agenda: typeof sessionDetails === 'string' ? sessionDetails : undefined,
+        timezone: expertTimeZone,
+      });
+      // console.log("meetingLink", zoomMeeting)
+      meetingLink = zoomMeeting.join_url;
+    } catch (zoomErr) {
+      console.error('Failed to create Zoom meeting', zoomErr);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to create Zoom meeting',
+      });
+      return;
+    }
+
     // // Create booking record
     const booking = await prisma.booking.create({
       data: {
@@ -66,6 +88,7 @@ export const createBooking = async (req: AuthenticatedRequest, res: Response) =>
         studentDateTime: studentMoment.toDate(),
         sessionDuration,
         sessionDetails, // Will represent PENDING until enum is fixed
+        meetingLink
       },
     });
 
@@ -103,7 +126,7 @@ export const createBooking = async (req: AuthenticatedRequest, res: Response) =>
     });
 
     // Respond to the client with the PaymentIntent details so the student can complete payment
-    res.json({
+    return res.json({
       success: true,
       message: "Booking Request sent successfully",
       data: {
@@ -115,7 +138,7 @@ export const createBooking = async (req: AuthenticatedRequest, res: Response) =>
     });
   } catch (error) {
     console.error("Error creating booking:", error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: "Failed to create booking",
       error: error instanceof Error ? error.message : "Internal server error",
