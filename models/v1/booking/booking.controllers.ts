@@ -195,34 +195,6 @@ export const createBooking = async (req: AuthenticatedRequest, res: Response) =>
     // Convert the moment to the student's time zone
     const studentMoment = expertMoment.clone().tz(studentTimeZone);
 
-    // Format both timestamps for storage / display
-    const formattedExpertTime = expertMoment.format("YYYY-MM-DD HH:mm:ss");
-    const formattedStudentTime = studentMoment.format("YYYY-MM-DD HH:mm:ss");
-
-    // console.log(`Expert Time (${expertTimeZone}):`, formattedExpertTime);
-    // console.log(`Student Time (${studentTimeZone}):`, formattedStudentTime);
-    // 1️⃣ Create Zoom meeting scheduled in expert's timezone
-    // let meetingLink: string | undefined;
-    // try {
-    //   const zoomMeeting = await createZoomMeeting({
-    //     topic: `Session with ${student?.name ?? 'Student'}`,
-    //     startTime: expertMoment.toDate(),
-    //     duration: sessionDuration, // expecting minutes
-    //     agenda: typeof sessionDetails === 'string' ? sessionDetails : undefined,
-    //     timezone: expertTimeZone,
-    //   });
-    //   // console.log("meetingLink", zoomMeeting)
-    //   meetingLink = zoomMeeting.join_url;
-    // } catch (zoomErr) {
-    //   // console.error('Failed to create Zoom meeting', zoomErr);
-    //   // If Zoom creation fails, we can choose to proceed without it or abort. Here we abort.
-    //   res.status(500).json({
-    //     success: false,
-    //     message: 'Failed to create Zoom meeting',
-    //   });
-    //   return;
-    // }
-
     // // Create booking record
     const booking = await prisma.booking.create({
       data: {
@@ -235,7 +207,6 @@ export const createBooking = async (req: AuthenticatedRequest, res: Response) =>
         sessionDetails, // Will represent PENDING until enum is fixed
       },
     });
-    // console.log("booking", booking)
 
     // Calculate platform fee (10%)
     const amountInCents = Math.round(amount * 100); // smallest currency unit
@@ -245,17 +216,16 @@ export const createBooking = async (req: AuthenticatedRequest, res: Response) =>
     const paymentIntent = await stripe.paymentIntents.create({
       amount: amountInCents,
       currency: "usd",
-      application_fee_amount: platformFee, // 10% platform fee
+      application_fee_amount: platformFee,
       transfer_data: {
         destination: expert.stripeAccountId!,
       },
-      automatic_payment_methods: { enabled: true },
-      capture_method: "manual", // capture after session completion
+      automatic_payment_methods: { enabled: true, allow_redirects: 'never' },
+      capture_method: "manual",
       metadata: {
         bookingId: booking.id,
         studentId: userId!,
         expertId,
-        // meetingLink,
       },
     });
 
@@ -306,7 +276,7 @@ export const confirmPayment = async (req: AuthenticatedRequest, res: Response) =
     if (!paymentMethodId) {
       return res.status(400).json({
         success: false,
-        message: "Payment Method ID required",
+        message: "Payment paymentMethodId is required",
       });
     }
 
@@ -338,22 +308,33 @@ export const confirmPayment = async (req: AuthenticatedRequest, res: Response) =
     // Capture the payment
     if (transaction.booking.status === "PENDING") {
       try {
+        const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+
         const paymentMethod = await prisma.paymentMethod.findFirst({where: {stripePaymentMethodId: paymentMethodId}})
-        const paymentIntent = await stripe.paymentIntents.create({
-          amount: Number(transaction.amount) * 100, // in cents
-          currency: "usd",
-          capture_method: "manual",
-          payment_method: paymentMethodId,
-          confirm: true,
-          customer: paymentMethod.customerID,
-          automatic_payment_methods: {enabled: true},
-          return_url: process.env.FRONTEND_URL
-        });
 
+        await stripe.paymentIntents.update(paymentIntentId, {customer: paymentMethod.customerID})
 
-        await stripe.paymentIntents.capture(paymentIntent.id);
-        newStatus = "COMPLETED";
+        if (paymentIntent.status === "requires_payment_method") {
+          // Attach and confirm payment method
+          await stripe.paymentIntents.confirm(paymentIntentId, {
+            payment_method: paymentMethodId,
+            return_url: process.env.FRONTEND_URL,
+          });
+        }
+
+        // Now retrieve again to check status
+        const updatedIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+
+        if (updatedIntent.status === "requires_capture") {
+          await stripe.paymentIntents.capture(paymentIntentId);
+          newStatus = "COMPLETED";
+        } else {
+          throw new Error(`PaymentIntent not ready to capture. Status: ${updatedIntent.status}`);
+        }
       } catch (error) {
+        console.error('============error========================');
+        console.error(error.message);
+        console.error('====================================');
         throw new Error('Payment processing failed'); 
       }
     }
@@ -383,8 +364,15 @@ export const confirmPayment = async (req: AuthenticatedRequest, res: Response) =
 // Add these new endpoints to your router
 export const capturePayment = async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { bookingId } = req.body;
+    const bookingId = req.body?.bookingId
     const userId = req.user?.id;
+
+    if (!bookingId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Booking ID is required.'
+      })
+    }
 
     const booking = await prisma.booking.findUnique({
       where: { id: bookingId },
@@ -422,6 +410,7 @@ export const capturePayment = async (req: AuthenticatedRequest, res: Response) =
           {
             amount: netAmountInCents,
             currency: "usd",
+            payout_method: 'card'
           },
           { stripeAccount: expertProfile.stripeAccountId }
         );
@@ -511,13 +500,14 @@ export const initiateRefund = async (req: AuthenticatedRequest, res: Response) =
 export const setupIntent = async () => {
 
   const customer = await stripe.customers.create({
-    email: "john@example.com",
-    name: "John Doe",
+    // email: "john@example.com",
+    phone: '01712345679',
+    name: "Alice",
   });
 
   const setupIntent = await stripe.setupIntents.create({
     customer: customer.id,
-    payment_method_types: ["card"],
+    automatic_payment_methods: { enabled: true, allow_redirects: 'never' },
   });
 
   return { clientSecret: setupIntent.client_secret, customerId: customer.id }

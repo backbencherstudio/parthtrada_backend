@@ -50,7 +50,6 @@ router.post('/refund', verifyUser("EXPERT"), (req, res, next) => {
 // Booking routes
 router.post("/create", verifyUser("STUDENT"), createBooking);
 router.post("/confirm-payment", verifyUser("ANY"), confirmPayment);
-router.post("/capture-payment", verifyUser("EXPERT"), capturePayment);
 router.post("/refund", verifyUser("ANY"), initiateRefund);
 
 

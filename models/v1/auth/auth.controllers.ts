@@ -316,7 +316,7 @@ export const updateUser = async (
   }
 };
 
-export const beExpart = async (
+export const beExpert = async (
   req: AuthenticatedRequest,
   res: Response
 ): Promise<void> => {

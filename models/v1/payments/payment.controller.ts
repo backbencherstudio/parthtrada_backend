@@ -6,7 +6,7 @@ const prisma = new PrismaClient();
 export const savePaymentMethod = async (req: AuthenticatedRequest, res: Response) => {
     try {
         const { paymentMethodId, customerId } = req.body
-        const userId = req?.user?.id || 'cmf3g8us50000vc1cv4wajg2s';
+        const userId = req?.user?.id || 'cmf68colv0001vcd4tt6jr4lr';
 
         await prisma.paymentMethod.create({
             data: {
