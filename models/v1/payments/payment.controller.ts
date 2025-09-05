@@ -2,7 +2,7 @@ import { Response } from "express";
 import { PrismaClient } from "@prisma/client";
 import Stripe from "stripe";
 import { AuthenticatedRequest } from "@/middleware/verifyUsers";
-import { withdrawTransactionSchema } from "@/utils/validation";
+import { confirmPaymentSchema, refundTransactionSchema, savePaymentMethodSchema, withdrawTransactionSchema } from "@/utils/validations";
 
 const prisma = new PrismaClient();
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
@@ -11,14 +11,26 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
 
 export const savePaymentMethod = async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { paymentMethodId, customerId } = req.body
+    const { data, error, success } = savePaymentMethodSchema.safeParse(req.body);
+    if (!success) {
+      if (!success) {
+        return res.status(400).json({
+          success: false,
+          errors: JSON.parse(error.message).map(err => ({
+            field: err.path.join("."),
+            message: err.message,
+          })),
+        });
+      }
+    }
+
     const userId = req?.user?.id || 'cmf68colv0001vcd4tt6jr4lr';
 
     await prisma.paymentMethod.create({
       data: {
-        stripePaymentMethodId: paymentMethodId,
+        stripePaymentMethodId: data.paymentMethodId,
         userId,
-        customerID: customerId
+        customerID: data.customerId
       }
     })
 
@@ -32,26 +44,25 @@ export const savePaymentMethod = async (req: AuthenticatedRequest, res: Response
 
 export const confirmPayment = async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { paymentIntentId, paymentMethodId } = req.body;
-    const userId = req.user?.id;
+    const { data, error, success } = confirmPaymentSchema.safeParse(req.body);
+    if (!success) {
+      if (!success) {
+        return res.status(400).json({
+          success: false,
+          errors: JSON.parse(error.message).map(err => ({
+            field: err.path.join("."),
+            message: err.message,
+          })),
+        });
+      }
+    }
 
-    if (!paymentIntentId) {
-      return res.status(400).json({
-        success: false,
-        message: "Payment intent ID required",
-      });
-    }
-    if (!paymentMethodId) {
-      return res.status(400).json({
-        success: false,
-        message: "Payment paymentMethodId is required",
-      });
-    }
+    const userId = req.user?.id;
 
     // Verify the booking belongs to this user
     const transaction = await prisma.transaction.findFirst({
       where: {
-        providerId: paymentIntentId,
+        providerId: data.paymentIntentId,
         booking: {
           OR: [
             { studentId: userId },
@@ -76,25 +87,25 @@ export const confirmPayment = async (req: AuthenticatedRequest, res: Response) =
     // Capture the payment
     if (transaction.booking.status === "PENDING") {
       try {
-        const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+        const paymentIntent = await stripe.paymentIntents.retrieve(data.paymentIntentId);
 
-        const paymentMethod = await prisma.paymentMethod.findFirst({ where: { stripePaymentMethodId: paymentMethodId } })
+        const paymentMethod = await prisma.paymentMethod.findFirst({ where: { stripePaymentMethodId: data.paymentMethodId } })
 
-        await stripe.paymentIntents.update(paymentIntentId, { customer: paymentMethod.customerID })
+        await stripe.paymentIntents.update(data.paymentIntentId, { customer: paymentMethod.customerID })
 
         if (paymentIntent.status === "requires_payment_method") {
           // Attach and confirm payment method
-          await stripe.paymentIntents.confirm(paymentIntentId, {
-            payment_method: paymentMethodId,
+          await stripe.paymentIntents.confirm(data.paymentIntentId, {
+            payment_method: data.paymentMethodId,
             return_url: process.env.FRONTEND_URL,
           });
         }
 
         // Now retrieve again to check status
-        const updatedIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+        const updatedIntent = await stripe.paymentIntents.retrieve(data.paymentIntentId);
 
         if (updatedIntent.status === "requires_capture") {
-          await stripe.paymentIntents.capture(paymentIntentId);
+          await stripe.paymentIntents.capture(data.paymentIntentId);
           newStatus = "COMPLETED";
         } else {
           throw new Error(`PaymentIntent not ready to capture. Status: ${updatedIntent.status}`);
@@ -129,11 +140,23 @@ export const confirmPayment = async (req: AuthenticatedRequest, res: Response) =
 
 export const refundTransaction = async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { bookingId, reason } = req.body;
+    const { data, error, success } = refundTransactionSchema.safeParse(req.body);
+    if (!success) {
+      if (!success) {
+        return res.status(400).json({
+          success: false,
+          errors: JSON.parse(error.message).map(err => ({
+            field: err.path.join("."),
+            message: err.message,
+          })),
+        });
+      }
+    }
+
     const userId = req.user?.id;
 
     const booking = await prisma.booking.findUnique({
-      where: { id: bookingId },
+      where: { id: data.bookingId },
       include: { transaction: true }
     });
 
@@ -148,7 +171,7 @@ export const refundTransaction = async (req: AuthenticatedRequest, res: Response
     // Create refund (reverse transfer, refund platform fee as well)
     const refund = await stripe.refunds.create({
       payment_intent: booking.transaction?.providerId!,
-      reason: reason || "requested_by_customer",
+      reason: 'requested_by_customer',
       reverse_transfer: true,
       refund_application_fee: true,
     });
@@ -156,15 +179,15 @@ export const refundTransaction = async (req: AuthenticatedRequest, res: Response
     // Update booking and transaction status
     await prisma.$transaction([
       prisma.booking.update({
-        where: { id: bookingId },
+        where: { id: data.bookingId },
         data: { status: "REFUNDED" }
       }),
       prisma.transaction.update({
-        where: { bookingId },
+        where: { bookingId: data.bookingId },
         data: {
           status: "REFUNDED",
           refundDate: new Date(),
-          refundReason: reason
+          refundReason: data?.reason || 'requested_by_customer'
         }
       })
     ]);
