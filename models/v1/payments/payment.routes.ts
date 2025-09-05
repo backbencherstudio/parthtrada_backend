@@ -1,5 +1,5 @@
 import {  Router } from 'express';
-import { confirmPayment, initiateRefund, savePaymentMethod } from './payment.controller';
+import { confirmPayment, refundTransaction, savePaymentMethod, withdrawTransaction } from './payment.controller';
 import { verifyUser } from '@/middleware/verifyUsers';
 import { checkOnboardingStatus, createStripeAccount, getOnboardingLink } from './stripe.controllers';
 
@@ -7,7 +7,8 @@ const router = Router()
 
 router.post('/save-payment-method', savePaymentMethod)
 router.post("/confirm-payment", verifyUser("ANY"), confirmPayment);
-router.post("/refund", verifyUser("ANY"), initiateRefund);
+router.post("/refund", verifyUser("EXPERT"), refundTransaction);
+router.post("/withdraw", verifyUser("EXPERT"), withdrawTransaction);
 
 // Stripe Connect routes
 router.post("/stripe/create-account", verifyUser("ANY"), createStripeAccount);

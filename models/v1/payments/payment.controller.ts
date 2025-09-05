@@ -2,6 +2,7 @@ import { Response } from "express";
 import { PrismaClient } from "@prisma/client";
 import Stripe from "stripe";
 import { AuthenticatedRequest } from "@/middleware/verifyUsers";
+import { withdrawTransactionSchema } from "@/utils/validation";
 
 const prisma = new PrismaClient();
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
@@ -9,24 +10,24 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
 });
 
 export const savePaymentMethod = async (req: AuthenticatedRequest, res: Response) => {
-    try {
-        const { paymentMethodId, customerId } = req.body
-        const userId = req?.user?.id || 'cmf68colv0001vcd4tt6jr4lr';
+  try {
+    const { paymentMethodId, customerId } = req.body
+    const userId = req?.user?.id || 'cmf68colv0001vcd4tt6jr4lr';
 
-        await prisma.paymentMethod.create({
-            data: {
-                stripePaymentMethodId: paymentMethodId,
-                userId,
-                customerID: customerId
-            }
-        })
+    await prisma.paymentMethod.create({
+      data: {
+        stripePaymentMethodId: paymentMethodId,
+        userId,
+        customerID: customerId
+      }
+    })
 
-        return res.status(201).json({
-            message: 'Payment Method Saved.'
-        })
-    } catch (error) {
-        return res.status(500).json({ message: 'Something went wrong.' })
-    }
+    return res.status(201).json({
+      message: 'Payment Method Saved.'
+    })
+  } catch (error) {
+    return res.status(500).json({ message: 'Something went wrong.' })
+  }
 }
 
 export const confirmPayment = async (req: AuthenticatedRequest, res: Response) => {
@@ -77,9 +78,9 @@ export const confirmPayment = async (req: AuthenticatedRequest, res: Response) =
       try {
         const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
 
-        const paymentMethod = await prisma.paymentMethod.findFirst({where: {stripePaymentMethodId: paymentMethodId}})
+        const paymentMethod = await prisma.paymentMethod.findFirst({ where: { stripePaymentMethodId: paymentMethodId } })
 
-        await stripe.paymentIntents.update(paymentIntentId, {customer: paymentMethod.customerID})
+        await stripe.paymentIntents.update(paymentIntentId, { customer: paymentMethod.customerID })
 
         if (paymentIntent.status === "requires_payment_method") {
           // Attach and confirm payment method
@@ -99,7 +100,7 @@ export const confirmPayment = async (req: AuthenticatedRequest, res: Response) =
           throw new Error(`PaymentIntent not ready to capture. Status: ${updatedIntent.status}`);
         }
       } catch (error) {
-        throw new Error(error?.message); 
+        throw new Error(error?.message);
       }
     }
 
@@ -126,7 +127,7 @@ export const confirmPayment = async (req: AuthenticatedRequest, res: Response) =
 };
 
 
-export const initiateRefund = async (req: AuthenticatedRequest, res: Response) => {
+export const refundTransaction = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { bookingId, reason } = req.body;
     const userId = req.user?.id;
@@ -180,5 +181,75 @@ export const initiateRefund = async (req: AuthenticatedRequest, res: Response) =
       message: "Failed to initiate refund",
       error: error instanceof Error ? error.message : "Internal server error",
     });
+  }
+};
+
+
+export const withdrawTransaction = async (req: AuthenticatedRequest, res: Response) => {
+  const { data, error, success } = withdrawTransactionSchema.safeParse(req.body);
+  if (!success) {
+    if (!success) {
+      return res.status(400).json({
+        success: false,
+        errors: JSON.parse(error.message).map(err => ({
+          field: err.path.join("."),
+          message: err.message,
+        })),
+      });
+    }
+  }
+
+  try {
+    // Get the transaction
+    const transaction = await prisma.transaction.findUnique({
+      where: {
+        id: data.transactionId,
+      },
+    });
+
+    if (!transaction) {
+      return res.status(404).json({ error: 'Transaction not found' });
+    }
+
+    if (data.withdrawVia === 'STRIPE') {
+      // Step 1: Process withdrawal to Stripe
+      const payout = await stripe.payouts.create({
+        amount: Number(transaction.amount) * 100, // Convert to cents
+        currency: 'usd',
+        destination: transaction.providerId, // Expert's Stripe account ID
+      });
+
+      // Step 2: Update transaction status to 'completed'
+      await prisma.transaction.update({
+        where: {
+          id: data.transactionId,
+        },
+        data: {
+          status: 'COMPLETED',
+          referenceNumber: payout.id,
+        },
+      });
+
+      return res.status(200).json({ message: 'Withdrawal processed successfully' });
+    }
+
+    if (data.withdrawVia === 'BANK') {
+      // Bank withdrawal (similar logic, but process via bank)
+      // Assuming you have a bank integration to handle this
+      await prisma.transaction.update({
+        where: {
+          id: data.transactionId,
+        },
+        data: {
+          status: 'COMPLETED',
+        },
+      });
+
+      return res.status(200).json({ message: 'Withdrawal processed successfully' });
+    }
+
+    return res.status(400).json({ error: 'Invalid withdrawal method' });
+  } catch (error) {
+    return res.status(400).json({ error: error.message });
   }
 };
