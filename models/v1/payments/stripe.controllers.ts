@@ -1,4 +1,4 @@
-import { Response } from "express";
+import { Request, Response } from "express";
 import { PrismaClient } from "@prisma/client";
 import Stripe from "stripe";
 import type { AuthenticatedRequest } from "@/middleware/verifyUsers";
@@ -151,3 +151,18 @@ export const checkOnboardingStatus = async (
     });
   }
 };
+
+export const webhook = async (req: Request, res: Response) => {
+  let event = req.body;
+  switch (event.type) {
+    case 'payment_intent.succeeded':
+      const data = event.data.object
+      console.log(`Payment intent Succeeded ${JSON.stringify(data)}.`);
+
+      break;
+    default:
+      return
+  }
+
+  res.json({ received: true });
+}
