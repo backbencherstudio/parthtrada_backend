@@ -1,12 +1,17 @@
 import { Router } from 'express';
-import { verifyUser } from '../../../middleware/verifyUsers';
 import { 
-  createBooking,
+  create,
+  index,
 } from "./booking.controllers";
+import { verifyUser } from '@/middleware/verifyUsers';
 
 const router = Router();
 
-// Booking routes
-router.post("/create", verifyUser("STUDENT"), createBooking);
+// Student Routes
+router.post("/", verifyUser("STUDENT"), create);
+router.get("/", verifyUser("STUDENT"), index);
+
+// Expert Routes
+router.get('/expert', verifyUser('EXPERT'))
 
 export default router;

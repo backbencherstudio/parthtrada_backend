@@ -5,6 +5,7 @@ import type { AuthenticatedRequest } from "@/middleware/verifyUsers";
 import moment from 'moment-timezone'
 import { createZoomMeeting } from "@/utils/zoom.utils";
 import { bookingSchema } from "@/utils/validations";
+import { bookingsQuerySchema } from "@/utils/queryValidation";
 
 const prisma = new PrismaClient();
 
@@ -12,7 +13,7 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2025-08-27.basil',
 });
 
-export const createBooking = async (req: AuthenticatedRequest, res: Response) => {
+export const create = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const userId = req.user?.id;
 
@@ -146,6 +147,115 @@ export const createBooking = async (req: AuthenticatedRequest, res: Response) =>
     });
   }
 };
+
+export const index = async (
+  req: AuthenticatedRequest,
+  res: Response
+): Promise<void> => {
+  const studentID = req.user?.id;
+
+  const query = bookingsQuerySchema.safeParse(req.query);
+
+  if (!query.success) {
+    res.status(400).json({
+      success: false,
+      message: "Invalid pagination parameters",
+      errors: query.error.flatten().fieldErrors,
+    });
+    return
+  }
+
+  const { page, perPage } = query.data;
+  const skip = (page - 1) * perPage;
+
+  try {
+    const total = await prisma.booking.count({
+      where: { studentId: studentID },
+    });
+
+    const bookings = await prisma.booking.findMany({
+      where: { studentId: studentID },
+      skip,
+      take: perPage,
+      orderBy: { date: "desc" },
+    });
+
+    res.status(200).json({
+      success: true,
+      message: "Bookings fetched successfully",
+      data: bookings,
+      pagination: {
+        total,
+        page,
+        perPage,
+        totalPages: Math.ceil(total / perPage),
+        hasNextPage: page * perPage < total,
+        hasPrevPage: page > 1,
+      },
+    });
+    return
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to get bookings.",
+      error: "Internal server error",
+    });
+    return
+  }
+};
+
+export const expertIndex = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const expertID = req.user?.id;
+
+    const query = bookingsQuerySchema.safeParse(req.query);
+
+    if (!query.success) {
+      res.status(400).json({
+        success: false,
+        message: "Invalid pagination parameters",
+        errors: query.error.flatten().fieldErrors,
+      });
+      return
+    }
+
+    const { page, perPage } = query.data;
+    const skip = (page - 1) * perPage;
+
+    const total = await prisma.booking.count({
+      where: { expertId: expertID },
+    });
+
+    const bookings = await prisma.booking.findMany({
+      where: { expertId: expertID },
+      skip,
+      take: perPage,
+      orderBy: { date: "desc" },
+    });
+
+    res.status(200).json({
+      success: true,
+      message: "Bookings fetched successfully",
+      data: bookings,
+      pagination: {
+        total,
+        page,
+        perPage,
+        totalPages: Math.ceil(total / perPage),
+        hasNextPage: page * perPage < total,
+        hasPrevPage: page > 1,
+      },
+    });
+    return
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to get bookings.",
+      error: "Internal server error",
+    });
+    return
+  }
+}
 
 // Add these new endpoints to your router
 export const capturePayment = async (req: AuthenticatedRequest, res: Response) => {

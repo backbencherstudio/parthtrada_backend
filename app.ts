@@ -36,7 +36,7 @@ app.use(express.json());
 app.use(morgan("dev"));
 
 app.use("/auth", authRoutes);
-app.use("/booking", booking);
+app.use("/bookings", booking);
 app.use("/chat", chatRoutes);
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 app.use("/admin", adminRoutes);
