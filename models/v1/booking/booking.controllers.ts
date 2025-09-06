@@ -1,5 +1,5 @@
 import type { Response } from "express";
-import { PrismaClient } from "@prisma/client";
+import { Prisma, PrismaClient } from "@prisma/client";
 import Stripe from "stripe";
 import type { AuthenticatedRequest } from "@/middleware/verifyUsers";
 import moment from 'moment-timezone'
@@ -154,27 +154,29 @@ export const index = async (
 ): Promise<void> => {
   const studentID = req.user?.id;
 
-  const query = bookingsQuerySchema.safeParse(req.query);
-
-  if (!query.success) {
+  const result = bookingsQuerySchema.safeParse(req.query);
+  if (!result.success) {
     res.status(400).json({
       success: false,
-      message: "Invalid pagination parameters",
-      errors: query.error.flatten().fieldErrors,
+      message: "Invalid query parameters",
+      errors: result.error.flatten().fieldErrors,
     });
     return
   }
 
-  const { page, perPage } = query.data;
+  const { page, perPage, status } = result.data;
   const skip = (page - 1) * perPage;
 
   try {
-    const total = await prisma.booking.count({
-      where: { studentId: studentID },
-    });
+    const where: Prisma.BookingWhereInput = {
+      studentId: studentID,
+      ...(status ? { status } : {}),
+    };
+
+    const total = await prisma.booking.count({ where });
 
     const bookings = await prisma.booking.findMany({
-      where: { studentId: studentID },
+      where,
       skip,
       take: perPage,
       orderBy: { date: "desc" },
@@ -200,9 +202,9 @@ export const index = async (
       message: "Failed to get bookings.",
       error: "Internal server error",
     });
-    return
   }
 };
+
 
 export const expertIndex = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
@@ -219,15 +221,20 @@ export const expertIndex = async (req: AuthenticatedRequest, res: Response): Pro
       return
     }
 
-    const { page, perPage } = query.data;
+    const { page, perPage, status } = query.data;
     const skip = (page - 1) * perPage;
 
+    const where: Prisma.BookingWhereInput = {
+      expertId: expertID,
+      ...(status ? { status } : {}),
+    };
+
     const total = await prisma.booking.count({
-      where: { expertId: expertID },
+      where,
     });
 
     const bookings = await prisma.booking.findMany({
-      where: { expertId: expertID },
+      where,
       skip,
       take: perPage,
       orderBy: { date: "desc" },
@@ -339,9 +346,9 @@ export const capturePayment = async (req: AuthenticatedRequest, res: Response) =
 export const setupIntent = async () => {
 
   const customer = await stripe.customers.create({
-    // email: "john@example.com",
+    email: "alice@example.com",
     phone: '01712345679',
-    name: "Alice",
+    name: "Alice Doe",
   });
 
   const setupIntent = await stripe.setupIntents.create({

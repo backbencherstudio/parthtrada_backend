@@ -24,7 +24,7 @@ export const savePaymentMethod = async (req: AuthenticatedRequest, res: Response
       }
     }
 
-    const userId = req?.user?.id || 'cmf68colv0001vcd4tt6jr4lr';
+    const userId = req?.user?.id || 'cmf7vvg1q0000vc8okiad3mx0';
 
     await prisma.paymentMethod.create({
       data: {
