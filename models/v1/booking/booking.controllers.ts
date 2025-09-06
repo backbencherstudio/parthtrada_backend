@@ -4,6 +4,7 @@ import Stripe from "stripe";
 import type { AuthenticatedRequest } from "@/middleware/verifyUsers";
 import moment from 'moment-timezone'
 import { createZoomMeeting } from "@/utils/zoom.utils";
+import { bookingSchema } from "@/utils/validations";
 
 const prisma = new PrismaClient();
 
@@ -14,21 +15,23 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
 export const createBooking = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const userId = req.user?.id;
-    // console.log(userId)
-    const { expertId, date, time, sessionDuration, sessionDetails, amount } = req.body;
-    // Validation
-    if (!expertId || !date || !time || !sessionDuration || !sessionDetails || !amount) {
-      res.status(400).json({
-        success: false,
-        message: "All booking details are required",
-      });
-      return
+
+    const { data, error, success } = bookingSchema.safeParse(req.body);
+    if (!success) {
+      if (!success) {
+        return res.status(400).json({
+          success: false,
+          errors: JSON.parse(error.message).map(err => ({
+            field: err.path.join("."),
+            message: err.message,
+          })),
+        });
+      }
     }
-    // console.log("body",expertId)
 
     // Check if expert has completed Stripe onboarding
     const expert = await prisma.expertProfile.findUnique({
-      where: { userId: expertId },
+      where: { userId: data.expertId },
       include: { user: true }
     });
     if (!expert?.stripeAccountId || !expert.isOnboardCompleted) {
@@ -45,7 +48,7 @@ export const createBooking = async (req: AuthenticatedRequest, res: Response) =>
     });
 
     // Combine date and time to create a complete datetime string
-    const expertDateTime = `${date} ${time}`;
+    const expertDateTime = `${data.date} ${data.time}`;
 
     // Fetch time-zone strings from the user records (should be valid IANA tz names)
     const expertTimeZone = expert?.user?.timeZone || "UTC";
@@ -63,11 +66,10 @@ export const createBooking = async (req: AuthenticatedRequest, res: Response) =>
       const zoomMeeting = await createZoomMeeting({
         topic: `Session with ${student?.name ?? 'Student'}`,
         startTime: expertMoment.toDate(),
-        duration: sessionDuration, // expecting minutes
-        agenda: typeof sessionDetails === 'string' ? sessionDetails : undefined,
+        duration: data.sessionDuration, // expecting minutes
+        agenda: data.sessionDetails,
         timezone: expertTimeZone,
       });
-      // console.log("meetingLink", zoomMeeting)
       meetingLink = zoomMeeting.join_url;
     } catch (zoomErr) {
       console.error('Failed to create Zoom meeting', zoomErr);
@@ -78,22 +80,22 @@ export const createBooking = async (req: AuthenticatedRequest, res: Response) =>
       return;
     }
 
-    // // Create booking record
+    // Create new booking record
     const booking = await prisma.booking.create({
       data: {
         studentId: userId,
-        expertId,
+        expertId: data.expertId,
         date: expertMoment.toDate(),
         expertDateTime: expertMoment.toDate(),
         studentDateTime: studentMoment.toDate(),
-        sessionDuration,
-        sessionDetails, // Will represent PENDING until enum is fixed
+        sessionDuration: data.sessionDuration,
+        sessionDetails: data.sessionDetails,
         meetingLink
       },
     });
 
     // Calculate platform fee (10%)
-    const amountInCents = Math.round(amount * 100); // smallest currency unit
+    const amountInCents = Math.round(data.amount * 100);
     const platformFee = Math.round(amountInCents * 0.1);
 
     // Create a PaymentIntent that transfers the funds directly to the expert’s account
@@ -109,7 +111,7 @@ export const createBooking = async (req: AuthenticatedRequest, res: Response) =>
       metadata: {
         bookingId: booking.id,
         studentId: userId!,
-        expertId,
+        expertId: data.expertId,
       },
     });
 
@@ -117,7 +119,7 @@ export const createBooking = async (req: AuthenticatedRequest, res: Response) =>
     await prisma.transaction.create({
       data: {
         bookingId: booking.id,
-        amount,
+        amount: data.amount,
         currency: "usd",
         provider: "STRIPE",
         providerId: paymentIntent.id,
@@ -131,8 +133,7 @@ export const createBooking = async (req: AuthenticatedRequest, res: Response) =>
       message: "Booking Request sent successfully",
       data: {
         bookingId: booking.id,
-        // clientSecret: paymentIntent.client_secret,
-        amount,
+        amount: data.amount,
         paymentIntentId: paymentIntent.id,
       },
     });

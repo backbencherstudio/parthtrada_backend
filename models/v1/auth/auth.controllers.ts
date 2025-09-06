@@ -9,6 +9,7 @@ import { v4 as uuidv4 } from "uuid";
 import bcrypt from "bcryptjs";
 import { baseUrl, getImageUrl } from "../../../utils/base_utl";
 import { generateOTP, sendVerificationOTP } from "../../../utils/emailService.utils";
+import { updateUserSchema } from "@/utils/validations";
 
 dotenv.config();
 
@@ -27,7 +28,7 @@ const fetchAccessToken = async (code: string) => {
     code,
     client_id: LINKEDIN_CONFIG.clientId,
     client_secret: LINKEDIN_CONFIG.clientSecret,
-    redirect_uri: LINKEDIN_CONFIG.redirectUri,                
+    redirect_uri: LINKEDIN_CONFIG.redirectUri,
   });
 
   const response = await fetch(LINKEDIN_CONFIG.tokenEndpoint, {
@@ -94,7 +95,7 @@ export const linkedinCallback = async (req: Request, res: Response) => {
 
     const tokenData = await fetchAccessToken(code);
     const userInfo = await fetchUserInfo(tokenData.access_token);
-    console.log("userInfo",userInfo);
+    console.log("userInfo", userInfo);
 
     // Download and save the profile picture
 
@@ -175,11 +176,24 @@ export const linkedinCallback = async (req: Request, res: Response) => {
 export const updateUser = async (
   req: AuthenticatedRequest,
   res: Response
-): Promise<void> => {
+): Promise<any> => {
   try {
     const userId = req.user?.id;
-    const { name, email, profile } = req.body;
-    const newImage = req.file;
+
+    const { data, error, success } = updateUserSchema.safeParse(req.body);
+    if (!success) {
+      if (!success) {
+        return res.status(400).json({
+          success: false,
+          errors: JSON.parse(error.message).map(err => ({
+            field: err.path.join("."),
+            message: err.message,
+          })),
+        });
+      }
+    }
+
+    const newImage = req?.file;
 
     const currentUser = await prisma.user.findUnique({
       where: { id: userId },
@@ -212,58 +226,58 @@ export const updateUser = async (
     const updatedUser = await prisma.user.update({
       where: { id: userId },
       data: {
-        name: name || currentUser.name,
-        email: email || currentUser.email,
+        name: data.name || currentUser.name,
+        email: data.email || currentUser.email,
         image: newImage ? newImage.filename : currentUser.image,
         // Update profile based on activeProfile
         ...(currentUser.activeProfile === "STUDENT" && {
-          studentProfile: profile
+          studentProfile: data.profile
             ? {
-                upsert: {
-                  create: {
-                    profession: profile.profession,
-                    organization: profile.organization,
-                    location: profile.location,
-                    description: profile.description,
-                  },
-                  update: {
-                    profession: profile.profession,
-                    organization: profile.organization,
-                    location: profile.location,
-                    description: profile.description,
-                  },
+              upsert: {
+                create: {
+                  profession: data.profile.profession,
+                  organization: data.profile.organization,
+                  location: data.profile.location,
+                  description: data.profile.description,
                 },
-              }
+                update: {
+                  profession: data.profile.profession,
+                  organization: data.profile.organization,
+                  location: data.profile.location,
+                  description: data.profile.description,
+                },
+              },
+            }
             : undefined,
         }),
         ...(currentUser.activeProfile === "EXPERT" && {
-          expertProfile: profile
+          expertProfile: data.profile
             ? {
-                upsert: {
-                  create: {
-                    profession: profile.profession,
-                    organization: profile.organization,
-                    location: profile.location,
-                    description: profile.description,
-                    experience: profile.experience,
-                    hourlyRate: profile.hourlyRate,
-                    skills: profile.skills,
-                    availableDays: profile.availableDays,
-                    availableTime: profile.availableTime,
-                  },
-                  update: {
-                    profession: profile.profession,
-                    organization: profile.organization,
-                    location: profile.location,
-                    description: profile.description,
-                    experience: profile.experience,
-                    hourlyRate: profile.hourlyRate,
-                    skills: profile.skills,
-                    availableDays: profile.availableDays,
-                    availableTime: profile.availableTime,
-                  },
+              upsert: {
+                create: {
+                  profession: data.profile.profession,
+                  organization: data.profile.organization,
+                  location: data.profile.location,
+                  description: data.profile.description,
+                  experience: data.profile.experience,
+                  hourlyRate: data.profile.hourlyRate,
+                  skills: data.profile.skills,
+                  availableDays: data.profile.availableDays,
+                  availableTime: data.profile.availableTime,
                 },
-              }
+                update: {
+                  profession: data.profile.profession,
+                  organization: data.profile.organization,
+                  location: data.profile.location,
+                  description: data.profile.description,
+                  experience: data.profile.experience,
+                  hourlyRate: data.profile.hourlyRate,
+                  skills: data.profile.skills,
+                  availableDays: data.profile.availableDays,
+                  availableTime: data.profile.availableTime,
+                },
+              },
+            }
             : undefined,
         }),
       },
@@ -390,31 +404,31 @@ export const beExpert = async (
         activeProfile: "EXPERT",
         expertProfile: currentUser.expertProfile
           ? {
-              update: {
-                profession,
-                organization,
-                location,
-                description,
-                experience,
-                hourlyRate,
-                skills,
-                availableDays,
-                availableTime,
-              },
-            }
-          : {
-              create: {
-                profession,
-                organization,
-                location,
-                description,
-                experience,
-                hourlyRate,
-                skills,
-                availableDays,
-                availableTime,
-              },
+            update: {
+              profession,
+              organization,
+              location,
+              description,
+              experience,
+              hourlyRate,
+              skills,
+              availableDays,
+              availableTime,
             },
+          }
+          : {
+            create: {
+              profession,
+              organization,
+              location,
+              description,
+              experience,
+              hourlyRate,
+              skills,
+              availableDays,
+              availableTime,
+            },
+          },
       },
       include: {
         studentProfile: true,
@@ -587,7 +601,7 @@ export const fordevSignup = async (req: Request, res: Response) => {
     const { name, email } = req.body;
 
     if (!name || !email) {
-       res.status(400).json({
+      res.status(400).json({
         success: false,
         message: "Name and email are required",
       });
@@ -595,7 +609,7 @@ export const fordevSignup = async (req: Request, res: Response) => {
 
     const existingUser = await prisma.user.findUnique({ where: { email } });
     if (existingUser) {
-       res.status(409).json({
+      res.status(409).json({
         success: false,
         message: "User already exists. Please login instead.",
       });
@@ -685,13 +699,13 @@ export const adminLogin = async (req: Request, res: Response): Promise<void> => 
     });
 
     await sendVerificationOTP(email, otp);
-  
+
     res.status(200).json({
-        otp,
-        success: true,
-        message: "OTP sent successfully",
+      otp,
+      success: true,
+      message: "OTP sent successfully",
     });
-    
+
 
   } catch (error) {
     res.status(500).json({
@@ -727,7 +741,7 @@ export const verifyOTP = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    const {password:_, ...userWithoutPassword} = user;
+    const { password: _, ...userWithoutPassword } = user;
 
     res.status(200).json({
       success: true,
@@ -765,7 +779,7 @@ export const resendOTP = async (req: Request, res: Response): Promise<void> => {
       await prisma.ucode.update({
         where: { id: existingUcode.id },
         data: {
-          otp: otp, 
+          otp: otp,
         },
       });
     } else {
@@ -780,7 +794,7 @@ export const resendOTP = async (req: Request, res: Response): Promise<void> => {
     }
 
     await sendVerificationOTP(email, otp);
-  
+
   } catch (error) {
     res.status(500).json({
       success: false,

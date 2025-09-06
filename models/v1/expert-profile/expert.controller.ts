@@ -1,13 +1,9 @@
 import type { Response } from "express";
-import { Prisma, PrismaClient } from "@prisma/client";
-import Stripe from "stripe";
-import type { AuthenticatedRequest } from "../../../middleware/verifyUsers";
-import moment from 'moment-timezone'
-import { createZoomMeeting } from '../../../utils/zoom.utils'
+import { PrismaClient } from "@prisma/client";
+import { AuthenticatedRequest } from "@/middleware/verifyUsers";
+import { createZoomMeeting } from "@/utils/zoom.utils";
 
 const prisma = new PrismaClient();
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
-
 
 export const acceptRejectBooking = async (req: AuthenticatedRequest, res: Response) => {
   try {

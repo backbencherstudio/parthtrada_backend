@@ -1,7 +1,8 @@
-import { Request, Response } from "express";
+import { Response } from "express";
 import { PrismaClient } from "@prisma/client";
 import type { AuthenticatedRequest } from "../../../middleware/verifyUsers";
 import { io } from "../../../socketServer";
+import { messageSchema } from "@/utils/validations";
 
 const prisma = new PrismaClient();
 
@@ -15,7 +16,7 @@ export const checkChatAccess = async (
     const { otherUserId } = req.params;
 
     if (!userId || !otherUserId) {
-       res.status(400).json({
+      res.status(400).json({
         success: false,
         message: "User IDs are required",
       });
@@ -23,14 +24,14 @@ export const checkChatAccess = async (
     }
 
     if (userId === otherUserId) {
-       res.status(400).json({
+      res.status(400).json({
         success: false,
         message: "Cannot chat with yourself",
       });
       return
     }
 
- 
+
     const booking = await prisma.booking.findFirst({
       where: {
         OR: [
@@ -43,12 +44,12 @@ export const checkChatAccess = async (
       },
     });
 
-     res.json({
+    res.json({
       success: true,
       canChat: !!booking,
     });
   } catch (error) {
-     res.status(500).json({
+    res.status(500).json({
       success: false,
       message: error instanceof Error ? error.message : "Internal server error",
     });
@@ -62,7 +63,7 @@ export const getChatRoom = async (req: AuthenticatedRequest, res: Response) => {
     const { otherUserId } = req.params;
 
     if (!userId || !otherUserId) {
-       res.status(400).json({
+      res.status(400).json({
         success: false,
         message: "User IDs are required",
       });
@@ -70,7 +71,7 @@ export const getChatRoom = async (req: AuthenticatedRequest, res: Response) => {
     }
 
     if (userId === otherUserId) {
-       res.status(400).json({
+      res.status(400).json({
         success: false,
         message: "Cannot create chat room with yourself",
       });
@@ -90,7 +91,7 @@ export const getChatRoom = async (req: AuthenticatedRequest, res: Response) => {
     ]);
 
     if (!currentUser || !otherUser) {
-       res.status(404).json({
+      res.status(404).json({
         success: false,
         message: "User not found",
       });
@@ -98,18 +99,18 @@ export const getChatRoom = async (req: AuthenticatedRequest, res: Response) => {
     }
 
     // Determine student and expert profiles
-    const studentProfile = 
+    const studentProfile =
       currentUser.activeProfile === 'STUDENT' ? currentUser.studentProfile :
-      otherUser.activeProfile === 'STUDENT' ? otherUser.studentProfile :
-      null;
+        otherUser.activeProfile === 'STUDENT' ? otherUser.studentProfile :
+          null;
 
-    const expertProfile = 
+    const expertProfile =
       currentUser.activeProfile === 'EXPERT' ? currentUser.expertProfile :
-      otherUser.activeProfile === 'EXPERT' ? otherUser.expertProfile :
-      null;
+        otherUser.activeProfile === 'EXPERT' ? otherUser.expertProfile :
+          null;
 
     if (!studentProfile || !expertProfile) {
-       res.status(400).json({
+      res.status(400).json({
         success: false,
         message: "Both student and expert profiles are required for chat",
       });
@@ -159,13 +160,13 @@ export const getChatRoom = async (req: AuthenticatedRequest, res: Response) => {
       },
     });
 
-     res.json({
+    res.json({
       success: true,
       chatRoom,
     });
   } catch (error) {
     console.error("Chat room error:", error);
-     res.status(500).json({
+    res.status(500).json({
       success: false,
       message: error instanceof Error ? error.message : "Internal server error",
     });
@@ -191,7 +192,7 @@ export const getChatMessages = async (
     });
 
     if (!chatRoom) {
-       res.status(404).json({
+      res.status(404).json({
         success: false,
         message: "Chat room not found",
       });
@@ -199,12 +200,12 @@ export const getChatMessages = async (
     }
 
     // Check if current user is either student or expert in this chat
-    const isParticipant = 
-      chatRoom.student.user.id === userId || 
+    const isParticipant =
+      chatRoom.student.user.id === userId ||
       chatRoom.expert.user.id === userId;
 
     if (!isParticipant) {
-       res.status(403).json({
+      res.status(403).json({
         success: false,
         message: "Unauthorized access to chat room",
       });
@@ -217,12 +218,12 @@ export const getChatMessages = async (
       take: 50,
     });
 
-     res.json({
+    res.json({
       success: true,
-      messages: messages.reverse(), 
+      messages: messages.reverse(),
     });
   } catch (error) {
-     res.status(500).json({
+    res.status(500).json({
       success: false,
       message: error instanceof Error ? error.message : "Internal server error",
     });
@@ -237,14 +238,18 @@ export const sendMessage = async (
   try {
     const { roomId } = req.params;
     const userId = req.user?.id;
-    const { content } = req.body;
 
-    if (!content?.trim()) {
-       res.status(400).json({
-        success: false,
-        message: "Message content is required and cannot be empty",
-      });
-      return
+    const { data, error, success } = messageSchema.safeParse(req.body);
+    if (!success) {
+      if (!success) {
+        return res.status(400).json({
+          success: false,
+          errors: JSON.parse(error.message).map(err => ({
+            field: err.path.join("."),
+            message: err.message,
+          })),
+        });
+      }
     }
 
     // Verify chat room exists and user has access
@@ -257,7 +262,7 @@ export const sendMessage = async (
     });
 
     if (!chatRoom) {
-       res.status(404).json({
+      res.status(404).json({
         success: false,
         message: "Chat room not found",
       });
@@ -269,7 +274,7 @@ export const sendMessage = async (
     const isExpert = chatRoom.expert.user.id === userId;
 
     if (!isStudent && !isExpert) {
-       res.status(403).json({
+      res.status(403).json({
         success: false,
         message: "Unauthorized to send message in this chat",
       });
@@ -279,7 +284,7 @@ export const sendMessage = async (
     // Create message with better validation
     const message = await prisma.message.create({
       data: {
-        content: content.trim(),
+        content: data.message.trim(),
         senderType: isStudent ? 'STUDENT' : 'EXPERT',
         senderId: userId,
         chatRoomId: roomId,
@@ -337,7 +342,7 @@ export const getChatList = async (
     });
 
     if (!user) {
-       res.status(404).json({
+      res.status(404).json({
         success: false,
         message: "User not found",
       });
@@ -392,13 +397,13 @@ export const getChatList = async (
       });
     }
 
-     res.json({
+    res.json({
       success: true,
       chatRooms,
     });
   } catch (error) {
     console.error("Get chat list error:", error);
-     res.status(500).json({
+    res.status(500).json({
       success: false,
       message: error instanceof Error ? error.message : "Internal server error",
     });
@@ -428,7 +433,7 @@ export const markMessagesAsRead = async (
     });
 
     if (!message) {
-       res.status(404).json({
+      res.status(404).json({
         success: false,
         message: "Message not found",
       });
@@ -436,12 +441,12 @@ export const markMessagesAsRead = async (
     }
 
     // Verify user is participant
-    const isParticipant = 
-      message.chatRoom.student.user.id === userId || 
+    const isParticipant =
+      message.chatRoom.student.user.id === userId ||
       message.chatRoom.expert.user.id === userId;
 
     if (!isParticipant) {
-       res.status(403).json({
+      res.status(403).json({
         success: false,
         message: "Unauthorized to mark messages as read",
       });
@@ -454,13 +459,13 @@ export const markMessagesAsRead = async (
       messageIds: [messageId],
     });
 
-     res.json({
+    res.json({
       success: true,
       message: "Message marked as read",
     });
   } catch (error) {
     console.error("Mark messages read error:", error);
-     res.status(500).json({
+    res.status(500).json({
       success: false,
       message: error instanceof Error ? error.message : "Internal server error",
     });
@@ -490,7 +495,7 @@ export const deleteMessage = async (
     });
 
     if (!message) {
-       res.status(404).json({
+      res.status(404).json({
         success: false,
         message: "Message not found",
       });
@@ -499,7 +504,7 @@ export const deleteMessage = async (
 
     // Verify user is the sender
     if (message.senderId !== userId) {
-       res.status(403).json({
+      res.status(403).json({
         success: false,
         message: "Unauthorized to delete this message",
       });
@@ -517,13 +522,13 @@ export const deleteMessage = async (
       deletedBy: userId,
     });
 
-     res.json({
+    res.json({
       success: true,
       message: "Message deleted successfully",
     });
   } catch (error) {
     console.error("Delete message error:", error);
-     res.status(500).json({
+    res.status(500).json({
       success: false,
       message: error instanceof Error ? error.message : "Internal server error",
     });
@@ -538,14 +543,17 @@ export const editMessage = async (
   try {
     const { messageId } = req.params;
     const userId = req.user?.id;
-    const { content } = req.body;
-
-    if (!content) {
-       res.status(400).json({
-        success: false,
-        message: "Content is required",
-      });
-      return
+    const { data, error, success } = messageSchema.safeParse(req.body);
+    if (!success) {
+      if (!success) {
+        return res.status(400).json({
+          success: false,
+          errors: JSON.parse(error.message).map(err => ({
+            field: err.path.join("."),
+            message: err.message,
+          })),
+        });
+      }
     }
 
     // Get message to verify ownership
@@ -562,38 +570,36 @@ export const editMessage = async (
     });
 
     if (!message) {
-       res.status(404).json({
+      return res.status(404).json({
         success: false,
         message: "Message not found",
       });
-      return
     }
 
     // Verify user is the sender
     if (message.senderId !== userId) {
-       res.status(403).json({
+      return res.status(403).json({
         success: false,
         message: "Unauthorized to edit this message",
       });
-      return
     }
 
     // Update message
     const updatedMessage = await prisma.message.update({
       where: { id: messageId },
-      data: { content },
+      data: { content: data.message },
     });
 
     // Emit socket event
     io.to(message.chatRoomId).emit('message_updated', updatedMessage);
 
-     res.json({
+    return res.json({
       success: true,
       message: updatedMessage,
     });
   } catch (error) {
     console.error("Edit message error:", error);
-     res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: error instanceof Error ? error.message : "Internal server error",
     });
@@ -618,7 +624,7 @@ export const getUnreadCount = async (
     });
 
     if (!user) {
-       res.status(404).json({
+      res.status(404).json({
         success: false,
         message: "User not found",
       });
@@ -650,13 +656,13 @@ export const getUnreadCount = async (
       });
     }
 
-     res.json({
+    res.json({
       success: true,
       unreadCount,
     });
   } catch (error) {
     console.error("Get unread count error:", error);
-     res.status(500).json({
+    res.status(500).json({
       success: false,
       message: error instanceof Error ? error.message : "Internal server error",
     });
@@ -686,7 +692,7 @@ export const markMessageAsRead = async (
     });
 
     if (!message) {
-       res.status(404).json({
+      res.status(404).json({
         success: false,
         message: "Message not found",
       });
@@ -699,7 +705,7 @@ export const markMessageAsRead = async (
       message.chatRoom.expert.user.id === userId;
 
     if (!isParticipant) {
-       res.status(403).json({
+      res.status(403).json({
         success: false,
         message: "Unauthorized access to message",
       });
@@ -712,7 +718,7 @@ export const markMessageAsRead = async (
       (message.senderType === 'STUDENT' && message.chatRoom.expert.user.id === userId);
 
     if (!isRecipient) {
-       res.status(400).json({
+      res.status(400).json({
         success: false,
         message: "Can only mark received messages as read",
       });
@@ -731,13 +737,13 @@ export const markMessageAsRead = async (
       readBy: userId,
     });
 
-     res.json({
+    res.json({
       success: true,
       message: updatedMessage,
     });
   } catch (error) {
     console.error("Mark message as read error:", error);
-     res.status(500).json({
+    res.status(500).json({
       success: false,
       message: error instanceof Error ? error.message : "Internal server error",
     });
