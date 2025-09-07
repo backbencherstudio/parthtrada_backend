@@ -2,7 +2,7 @@ import { Response } from "express";
 import { PrismaClient } from "@prisma/client";
 import Stripe from "stripe";
 import { AuthenticatedRequest } from "@/middleware/verifyUsers";
-import { confirmPaymentSchema, refundTransactionSchema, savePaymentMethodSchema, withdrawTransactionSchema } from "@/utils/validations";
+import { confirmPaymentSchema, payoutsSchema, refundTransactionSchema, savePaymentMethodSchema } from "@/utils/validations";
 
 const prisma = new PrismaClient();
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
@@ -208,8 +208,8 @@ export const refundTransaction = async (req: AuthenticatedRequest, res: Response
 };
 
 
-export const withdrawTransaction = async (req: AuthenticatedRequest, res: Response) => {
-  const { data, error, success } = withdrawTransactionSchema.safeParse(req.body);
+export const payouts = async (req: AuthenticatedRequest, res: Response) => {
+  const { data, error, success } = payoutsSchema.safeParse(req.body);
   if (!success) {
     if (!success) {
       return res.status(400).json({
@@ -221,58 +221,59 @@ export const withdrawTransaction = async (req: AuthenticatedRequest, res: Respon
       });
     }
   }
-
   try {
-    // Get the transaction
-    const transaction = await prisma.transaction.findUnique({
-      where: {
-        id: data.transactionId,
+    const userID = req.user?.id
+    const expert = await prisma.expertProfile.findFirst({ where: { userId: userID } })
+
+    const stripeAccount = expert?.stripeAccountId
+
+    if (!stripeAccount) {
+      res.status(404).json({
+        message: 'Please connect your stripe account first'
+      })
+      return
+    }
+
+    await stripe.payouts.create(
+      {
+        amount: data.amount * 100,
+        currency: "usd",
       },
-    });
+      {
+        stripeAccount: stripeAccount
+      }
+    );
 
-    if (!transaction) {
-      return res.status(404).json({ error: 'Transaction not found' });
-    }
 
-    if (data.withdrawVia === 'STRIPE') {
-      // Step 1: Process withdrawal to Stripe
-      const payout = await stripe.payouts.create({
-        amount: Number(transaction.amount) * 100, // Convert to cents
-        currency: 'usd',
-        destination: transaction.providerId, // Expert's Stripe account ID
-      });
-
-      // Step 2: Update transaction status to 'completed'
-      await prisma.transaction.update({
-        where: {
-          id: data.transactionId,
-        },
-        data: {
-          status: 'COMPLETED',
-          referenceNumber: payout.id,
-        },
-      });
-
-      return res.status(200).json({ message: 'Withdrawal processed successfully' });
-    }
-
-    if (data.withdrawVia === 'BANK') {
-      // Bank withdrawal (similar logic, but process via bank)
-      // Assuming you have a bank integration to handle this
-      await prisma.transaction.update({
-        where: {
-          id: data.transactionId,
-        },
-        data: {
-          status: 'COMPLETED',
-        },
-      });
-
-      return res.status(200).json({ message: 'Withdrawal processed successfully' });
-    }
-
-    return res.status(400).json({ error: 'Invalid withdrawal method' });
+    return res.status(200).json({ message: 'Payout created successfully.', data: {} });
   } catch (error) {
     return res.status(400).json({ error: error.message });
   }
 };
+
+export const balance = async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const userID = req.user?.id
+    const expert = await prisma.expertProfile.findFirst({ where: { userId: userID } })
+
+    const stripeAccount = expert?.stripeAccountId
+
+    if (!stripeAccount) {
+      res.status(404).json({
+        message: 'Please connect your stripe account first'
+      })
+      return
+    }
+
+    const balance = await stripe.balance.retrieve({
+      stripeAccount: stripeAccount
+    });
+
+    res.status(200).json({
+      data: balance
+    })
+    return
+  } catch (error) {
+
+  }
+}

@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import { PrismaClient } from "@prisma/client";
 import Stripe from "stripe";
 import type { AuthenticatedRequest } from "@/middleware/verifyUsers";
+import fs from 'fs';
 
 const prisma = new PrismaClient();
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
@@ -54,7 +55,7 @@ export const createStripeAccount = async (
       accountId: account.id,
     });
   } catch (error) {
-    console.error("Error creating Stripe account:", error);
+    console.error("Error creating Stripe account:", error?.message);
     res.status(500).json({
       success: false,
       message: "Failed to create Stripe account",

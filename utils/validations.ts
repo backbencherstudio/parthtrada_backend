@@ -38,9 +38,8 @@ export const refundTransactionSchema = z.object({
 });
 
 
-export const withdrawTransactionSchema = z.object({
-  transactionId: z.string().min(1, { error: 'Transaction ID is required.' }),
-  withdrawVia: z.string().min(1, { error: 'Withdraw Via is required' }),
+export const payoutsSchema = z.object({
+  amount: z.number(),
 });
 
 export const messageSchema = z.object({
