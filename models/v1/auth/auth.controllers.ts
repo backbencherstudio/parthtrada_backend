@@ -151,25 +151,33 @@ export const linkedinCallback = async (req: Request, res: Response) => {
           : user.expertProfile,
     };
 
+    res.redirect(
+      `elearningapp://ParentScreen?token=${token}&data=${encodeURIComponent(
+        JSON.stringify(responseData)
+      )}`
+    );
+    return
 
-    res.json({
-      message: "Authentication successful",
-      token,
-      user: responseData,
-      redirect_url: 'myapp://ParentScreen'
-    });
+    // res.json({
+    //   message: "Authentication successful",
+    //   token,
+    //   user: responseData,
+    //   redirect_url: 'elearningapp://ParentScreen'
+    // });
   } catch (error) {
     console.error("Authentication error:", error);
-
-    const statusCode =
-      error instanceof Error && error.message.includes("status:") ? 502 : 500;
     const errorMessage =
       error instanceof Error ? error.message : "Internal server error";
 
-    res.status(statusCode).json({
-      message: "Authentication failed",
-      error: errorMessage,
-    });
+    const statusCode =
+      error instanceof Error && error.message.includes("status:") ? 502 : 500;
+
+    res.redirect(`elearningapp://FailedLogin?error=${errorMessage}`)
+
+    // res.status(statusCode).json({
+    //   message: "Authentication failed",
+    //   error: errorMessage,
+    // });
   }
 };
 

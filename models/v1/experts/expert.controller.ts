@@ -1,9 +1,62 @@
-import type { Response } from "express";
-import { PrismaClient } from "@prisma/client";
+import type { Request, Response } from "express";
+import { Prisma, PrismaClient } from "@prisma/client";
 import { AuthenticatedRequest } from "@/middleware/verifyUsers";
 import { createZoomMeeting } from "@/utils/zoom.utils";
+import { expertsQuerySchema } from "@/utils/queryValidation";
 
 const prisma = new PrismaClient();
+
+export const index = async (req: Request, res: Response) => {
+  try {
+    const result = expertsQuerySchema.safeParse(req.query);
+    if (!result.success) {
+      res.status(400).json({
+        success: false,
+        message: "Invalid query parameters",
+        errors: result.error.flatten().fieldErrors,
+      });
+      return
+    }
+
+    const { page, perPage, name } = result.data;
+    const skip = (page - 1) * perPage;
+
+    const where: Prisma.ExpertProfileWhereInput = {
+      ...(name
+        ? {
+          user: {
+            name: {
+              contains: name,
+              mode: "insensitive",
+            },
+          },
+        }
+        : {}),
+    };
+    const total = await prisma.expertProfile.count({ where });
+    const data = await prisma.expertProfile.findMany({ where, include: { user: { select: { name: true, email: true, image: true } } } })
+
+    res.status(200).json({
+      data: data,
+      pagination: {
+        total,
+        page,
+        perPage,
+        totalPages: Math.ceil(total / perPage),
+        hasNextPage: page * perPage < total,
+        hasPrevPage: page > 1,
+      },
+    })
+  } catch (error) {
+    console.error('Error getting experts:', error?.message)
+    res.status(500).json({
+      success: false,
+      message: "Failed to get experts.",
+      error: error instanceof Error ? error.message : "Internal server error",
+    });
+    return
+  }
+}
 
 export const acceptRejectBooking = async (req: AuthenticatedRequest, res: Response) => {
   try {
@@ -183,7 +236,7 @@ export const createMeetingLink = async (req: AuthenticatedRequest, res: Response
   try {
     const { bookingId } = req.params;
     const expertId = req.user?.id;
-    
+
     // get the booking details
     const booking = await prisma.booking.findUnique({
       where: { id: bookingId },
@@ -230,7 +283,7 @@ export const createMeetingLink = async (req: AuthenticatedRequest, res: Response
     }
 
     // todo: send notification to the student that the meeting link is created
-    
+
     // update the booking with the meeting link
     const updatedBooking = await prisma.booking.update({
       where: { id: bookingId },
@@ -263,7 +316,7 @@ export const expertSchedule = async (req: AuthenticatedRequest, res: Response) =
       success: true,
       message: "Schedule fetched successfully",
       data: bookings
-    }); 
+    });
   } catch (error) {
     console.error("Error fetching schedule:", error);
     res.status(500).json({
