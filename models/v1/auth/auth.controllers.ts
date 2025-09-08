@@ -6,8 +6,7 @@ import { AuthenticatedRequest } from "../../../middleware/verifyUsers";
 import fs from "fs";
 import path from "path";
 import { v4 as uuidv4 } from "uuid";
-import bcrypt from "bcryptjs";
-import { baseUrl, getImageUrl } from "../../../utils/base_utl";
+import { getImageUrl } from "../../../utils/base_utl";
 import { generateOTP, sendVerificationOTP } from "../../../utils/emailService.utils";
 import { updateUserSchema } from "@/utils/validations";
 
@@ -157,6 +156,7 @@ export const linkedinCallback = async (req: Request, res: Response) => {
       message: "Authentication successful",
       token,
       user: responseData,
+      redirect_url: 'myapp://ParentScreen'
     });
   } catch (error) {
     console.error("Authentication error:", error);
@@ -803,27 +803,3 @@ export const resendOTP = async (req: Request, res: Response): Promise<void> => {
   }
 }
 
-// import React from "react";
-
-// const Login = () => {
-//   const handleLogin = () => {
-//     const params = new URLSearchParams({
-//       response_type: "code",
-//       client_id: "785hgn6asywpg6",
-//       redirect_uri: "http://192.168.4.3:8000/auth/linkedin/callback",
-//       scope: "openid email profile",
-//     });
-//     window.location.href = `https://www.linkedin.com/oauth/v2/authorization?${params.toString()}`;
-//   };
-//   return (
-//     <div>
-//       <h1>Linkdin Login</h1>
-
-//       <button onClick={handleLogin}>Signin with Linkdin</button>
-//     </div>
-//   );
-// };
-
-// export default Login;
-
-// eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6ImNtYzRkejAzcjAwMDB1b3R3M3J4ZnJjcGkiLCJlbWFpbCI6InRxbWhvc2FpbkBnbWFpbC5jb20iLCJuYW1lIjoiVFFNIEhvc2FpbiIsImFjdGl2ZVByb2ZpbGUiOiJTVFVERU5UIiwiaWF0IjoxNzUwMzk4MzMwLCJleHAiOjE3NTEwMDMxMzB9.JoosjkTH57iFeRIf2NceGAYR99jaJ7M99HWhSrtu2pc
