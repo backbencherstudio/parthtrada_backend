@@ -2,7 +2,7 @@ import type { Request, Response } from "express";
 import { Prisma, PrismaClient } from "@prisma/client";
 import { AuthenticatedRequest } from "@/middleware/verifyUsers";
 import { createZoomMeeting } from "@/utils/zoom.utils";
-import { expertsQuerySchema } from "@/utils/queryValidation";
+import { expertScheduleQuerySchema, expertsQuerySchema } from "@/utils/queryValidation";
 
 const prisma = new PrismaClient();
 
@@ -34,9 +34,10 @@ export const index = async (req: Request, res: Response) => {
         : {}),
     };
     const total = await prisma.expertProfile.count({ where });
-    const data = await prisma.expertProfile.findMany({ where, include: { user: { select: { name: true, email: true, image: true } } } })
+    const data = await prisma.expertProfile.findMany({ where, skip, include: { user: { select: { name: true, email: true, image: true } } } })
 
     res.status(200).json({
+      message: 'Experts fetched successfully.',
       data: data,
       pagination: {
         total,
@@ -303,11 +304,31 @@ export const expertSchedule = async (req: AuthenticatedRequest, res: Response) =
   try {
     const expertId = req.user?.id;
     // get all the upcoming bookings for the expert
+
+    const result = expertScheduleQuerySchema.safeParse(req.query);
+    if (!result.success) {
+      res.status(400).json({
+        success: false,
+        message: "Invalid query parameters",
+        errors: result.error.flatten().fieldErrors,
+      });
+      return
+    }
+
+    const { page, perPage } = result.data;
+    const skip = (page - 1) * perPage;
+
+    const where: Prisma.BookingWhereInput = {
+      expertId: expertId,
+      status: 'UPCOMING'
+    }
+
+    const total = await prisma.booking.count({
+      where,
+    });
     const bookings = await prisma.booking.findMany({
-      where: {
-        expertId: expertId,
-        status: "UPCOMING",
-      },
+      where,
+      skip,
       include: {
         student: true,
       },
@@ -315,7 +336,15 @@ export const expertSchedule = async (req: AuthenticatedRequest, res: Response) =
     res.status(200).json({
       success: true,
       message: "Schedule fetched successfully",
-      data: bookings
+      data: bookings,
+      pagination: {
+        total,
+        page,
+        perPage,
+        totalPages: Math.ceil(total / perPage),
+        hasNextPage: page * perPage < total,
+        hasPrevPage: page > 1,
+      },
     });
   } catch (error) {
     console.error("Error fetching schedule:", error);
