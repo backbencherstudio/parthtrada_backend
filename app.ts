@@ -10,6 +10,7 @@ import adminRoutes from "./models/v1/admin-dashboard/admin.routes";
 import homeRoutes from "./models/v1/home/home.routes";
 import expertRoutes from "./models/v1/experts/expert.routes";
 import paymentRoutes from "./models/v1/payments/payment.routes";
+import profileRoutes from "./models/v1/profile/profile.routes";
 import { setupIntent } from "./models/v1/booking/booking.controllers";
 
 const app = express();
@@ -36,6 +37,7 @@ app.use(express.json());
 app.use(morgan("dev"));
 
 app.use("/auth", authRoutes);
+app.use("/profile", profileRoutes);
 app.use("/bookings", booking);
 app.use("/chat", chatRoutes);
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
