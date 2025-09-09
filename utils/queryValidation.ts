@@ -30,6 +30,8 @@ export const expertsQuerySchema = z.object({
         .refine(val => val > 0, { message: 'PerPage must be greater than 0' }),
     name: z.string()
         .optional(),
+    skills: z.string()
+        .optional(),
 })
 
 export const expertScheduleQuerySchema = z.object({

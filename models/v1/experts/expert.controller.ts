@@ -33,12 +33,49 @@ export const index = async (req: Request, res: Response) => {
         }
         : {}),
     };
+
+    if (result.data.skills) {
+      const skillsArray = (result.data.skills as string)
+        .split(',')
+        .map(s => s.trim())
+        .filter(s => s);
+      where.skills = { hasSome: skillsArray, };
+    }
+
+    const andConditions: Prisma.ExpertProfileWhereInput[] = [];
+
+    if (andConditions.length > 0) {
+      where.AND = andConditions;
+    }
+
     const total = await prisma.expertProfile.count({ where });
-    const data = await prisma.expertProfile.findMany({ where, skip, include: { user: { select: { name: true, email: true, image: true } } } })
+    const data = await prisma.expertProfile.findMany({
+      where,
+      skip,
+      include: { user: { select: { name: true, email: true, image: true } } }
+    });
+
+    const expertIds = data.map(expert => expert.userId);
+    const ratings = await prisma.review.groupBy({
+      by: ['expertId'],
+      where: { expertId: { in: expertIds } },
+      _avg: { rating: true },
+      _count: { rating: true }
+    });
+
+    const ratingsMap = Object.fromEntries(
+      ratings.map(r => [r.expertId, { avg: r._avg.rating, total: r._count.rating }])
+    );
+
+    const dataWithRatings = data.map(expert => ({
+      ...expert,
+      averageRating: ratingsMap[expert.userId] ?? { avg: 0, total: 0 }
+    }));
 
     res.status(200).json({
+      success: true,
       message: 'Experts fetched successfully.',
-      data: data,
+      data: dataWithRatings,
       pagination: {
         total,
         page,

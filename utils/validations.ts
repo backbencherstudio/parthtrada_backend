@@ -45,3 +45,9 @@ export const payoutsSchema = z.object({
 export const messageSchema = z.object({
   message: z.string().min(1, { error: 'Message cannot be empty.' })
 })
+
+export const reviewSchema = z.object({
+  bookingId: z.string().min(1, { error: 'Booking ID is required.' }),
+  rating: z.number().max(5),
+  description: z.string().optional(),
+})

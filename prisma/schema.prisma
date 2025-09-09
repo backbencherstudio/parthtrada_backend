@@ -177,12 +177,6 @@ model Review {
   updatedAt DateTime @updatedAt
 }
 
-// | Field       | মানে                        |
-// | ----------- | -------------------------- |
-// | `studentId` | কে review দিল              |
-// | `expertId`  | কাকে review দিল            |
-// | `bookingId` | কোন session-এর জন্য review |
-
 model Notification {
   id          String           @id @default(cuid())
   title       String
