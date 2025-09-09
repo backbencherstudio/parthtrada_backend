@@ -69,7 +69,7 @@ export const index = async (req: Request, res: Response) => {
 
     const dataWithRatings = data.map(expert => ({
       ...expert,
-      averageRating: ratingsMap[expert.userId] ?? { avg: 0, total: 0 }
+      rating: ratingsMap[expert.userId] ?? { avg: 0, total: 0 }
     }));
 
     res.status(200).json({
@@ -90,6 +90,47 @@ export const index = async (req: Request, res: Response) => {
     res.status(500).json({
       success: false,
       message: "Failed to get experts.",
+      error: error instanceof Error ? error.message : "Internal server error",
+    });
+    return
+  }
+}
+
+export const getExpertById = async (req: Request, res: Response) => {
+  try {
+    const id = req.params?.id
+
+    if (!id) {
+      res.status(400).json({
+        success: false,
+        message: 'Please provide expert ID.',
+      })
+      return
+    }
+
+    const expert = await prisma.expertProfile.findFirst({
+      where: { id },
+      include: { user: { select: { name: true, email: true, image: true } } }
+    });
+
+    if (!expert) {
+      res.status(404).json({
+        success: false,
+        message: 'Expert not found.',
+      })
+      return
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Expert fetched successfully.',
+      data: expert,
+    })
+  } catch (error) {
+    console.error('Error getting expert:', error?.message)
+    res.status(500).json({
+      success: false,
+      message: "Failed to get expert.",
       error: error instanceof Error ? error.message : "Internal server error",
     });
     return
