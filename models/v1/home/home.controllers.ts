@@ -18,11 +18,11 @@ export const getExperts = async (req: AuthenticatedRequest, res: Response) => {
     const limitNum = parseInt(limit as string, 10);
     const skip = (pageNum - 1) * limitNum;
 
-    const where: Prisma.UserWhereInput = {
+    const where: Prisma.UsersWhereInput = {
       activeProfile: 'EXPERT',
     };
 
-    const andConditions: Prisma.UserWhereInput[] = [];
+    const andConditions: Prisma.UsersWhereInput[] = [];
 
     if (search && (search as string).trim() !== '') {
       const searchString = search as string;
@@ -48,7 +48,7 @@ export const getExperts = async (req: AuthenticatedRequest, res: Response) => {
       where.AND = andConditions;
     }
 
-    const experts = await prisma.user.findMany({
+    const experts = await prisma.users.findMany({
       where,
       include: {
         expertProfile: true,
@@ -60,7 +60,7 @@ export const getExperts = async (req: AuthenticatedRequest, res: Response) => {
       },
     });
 
-    const totalExperts = await prisma.user.count({ where });
+    const totalExperts = await prisma.users.count({ where });
 
     res.status(200).json({
       success: true,
@@ -95,7 +95,7 @@ export const getExpertById = async (req: AuthenticatedRequest, res: Response) =>
       return;
     }
 
-    const expert = await prisma.user.findUnique({
+    const expert = await prisma.users.findUnique({
       where: {
         id,
         activeProfile: 'EXPERT',

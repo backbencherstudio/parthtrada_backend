@@ -6,7 +6,7 @@ const prisma = new PrismaClient();
 
 export const myProfile = async (req: AuthenticatedRequest, res: Response) => {
     try {
-        const user = await prisma.user.findUnique({
+        const user = await prisma.users.findUnique({
             where: { id: req.user?.id },
             select: {
                 id: true,
@@ -17,7 +17,7 @@ export const myProfile = async (req: AuthenticatedRequest, res: Response) => {
                 lastLogin: true,
                 image: true,
                 activeProfile: true,
-                timeZone: true,
+                timezone: true,
                 createdAt: true,
                 updatedAt: true
             }

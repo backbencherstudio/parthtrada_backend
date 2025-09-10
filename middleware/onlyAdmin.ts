@@ -22,7 +22,7 @@ export const onlyAdmin = async(
   try {
     const decoded: any = jwt.verify(token, process.env.JWT_SECRET as string);
     
-    const user = await prisma.user.findUnique({
+    const user = await prisma.users.findUnique({
       where: { id: decoded.id },
     });
 

@@ -161,17 +161,17 @@ model PaymentMethod {
 }
 
 model Users {
-  id              String          @id(map: "User_pkey")
-  linkedInId      String          @unique(map: "User_linkedInId_key")
+  id              String          @id @default(cuid())
+  linkedInId      String          @unique
   name            String?
-  email           String?         @unique(map: "User_email_key")
+  email           String?         @unique
   password        String?
   lastLogin       DateTime?
   image           String?
   activeProfile   Role            @default(STUDENT)
   timezone        String?
   createdAt       DateTime        @default(now())
-  updatedAt       DateTime
+  updatedAt       DateTime        @updatedAt
   expertBookings  Booking[]       @relation("ExpertBookings")
   studentBookings Booking[]       @relation("StudentBookings")
   expertProfile   ExpertProfile?

@@ -44,7 +44,7 @@ export const create = async (req: AuthenticatedRequest, res: Response) => {
     }
 
     // get the student user details
-    const student = await prisma.user.findUnique({
+    const student = await prisma.users.findUnique({
       where: { id: userId },
     });
 
@@ -52,8 +52,8 @@ export const create = async (req: AuthenticatedRequest, res: Response) => {
     const expertDateTime = `${data.date} ${data.time}`;
 
     // Fetch time-zone strings from the user records (should be valid IANA tz names)
-    const expertTimeZone = expert?.user?.timeZone || "UTC";
-    const studentTimeZone = student?.timeZone || "UTC";
+    const expertTimeZone = expert?.user?.timezone || "UTC";
+    const studentTimeZone = student?.timezone || "UTC";
 
     // Create a moment object in the expert's time zone
     const expertMoment = moment.tz(expertDateTime, "YYYY-MM-DD hh:mm a", expertTimeZone);

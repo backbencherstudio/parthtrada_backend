@@ -98,7 +98,7 @@ export const linkedinCallback = async (req: Request, res: Response) => {
 
     // Download and save the profile picture
 
-    let user = await prisma.user.findFirst({
+    let user = await prisma.users.findFirst({
       where: {
         linkedInId: userInfo.sub,
       },
@@ -112,7 +112,7 @@ export const linkedinCallback = async (req: Request, res: Response) => {
     if (!user) {
       const savedImagePath = await downloadAndSaveImage(userInfo.picture);
 
-      user = await prisma.user.create({
+      user = await prisma.users.create({
         data: {
           linkedInId: userInfo.sub,
           name: userInfo.name,
@@ -203,7 +203,7 @@ export const updateUser = async (
 
     const newImage = req?.file;
 
-    const currentUser = await prisma.user.findUnique({
+    const currentUser = await prisma.users.findUnique({
       where: { id: userId },
       include: {
         studentProfile: true,
@@ -231,7 +231,7 @@ export const updateUser = async (
     }
 
     // Update basic user data
-    const updatedUser = await prisma.user.update({
+    const updatedUser = await prisma.users.update({
       where: { id: userId },
       data: {
         name: data.name || currentUser.name,
@@ -372,7 +372,7 @@ export const beExpert = async (
     const missingField = requiredFields.find((field) => !req.body[field]);
 
     // Find current user with profile
-    const currentUser = await prisma.user.findUnique({
+    const currentUser = await prisma.users.findUnique({
       where: { id: userId },
       include: {
         studentProfile: true,
@@ -406,7 +406,7 @@ export const beExpert = async (
     }
 
     // Create or update the expert profile
-    const updatedUser = await prisma.user.update({
+    const updatedUser = await prisma.users.update({
       where: { id: userId },
       data: {
         activeProfile: "EXPERT",
@@ -488,7 +488,7 @@ export const beStudent = async (
   try {
     const userId = req.user?.id;
 
-    const currentUser = await prisma.user.findUnique({
+    const currentUser = await prisma.users.findUnique({
       where: { id: userId },
       include: {
         studentProfile: true,
@@ -504,7 +504,7 @@ export const beStudent = async (
       return;
     }
 
-    const updatedUser = await prisma.user.update({
+    const updatedUser = await prisma.users.update({
       where: { id: userId },
       data: {
         activeProfile: "STUDENT",
@@ -565,7 +565,7 @@ export const fordev = async (req: Request, res: Response) => {
     }
 
     // Find user
-    const user = await prisma.user.findUnique({ where: { email } });
+    const user = await prisma.users.findUnique({ where: { email } });
     if (!user) {
       res.status(401).json({ success: false, message: "Invalid credentials" });
       return;
@@ -584,7 +584,7 @@ export const fordev = async (req: Request, res: Response) => {
     );
 
     // Optional: Update lastLogin
-    let data = await prisma.user.update({
+    let data = await prisma.users.update({
       where: { id: user.id },
       data: { lastLogin: new Date() },
     });
@@ -615,7 +615,7 @@ export const fordevSignup = async (req: Request, res: Response) => {
       });
     }
 
-    const existingUser = await prisma.user.findUnique({ where: { email } });
+    const existingUser = await prisma.users.findUnique({ where: { email } });
     if (existingUser) {
       res.status(409).json({
         success: false,
@@ -624,7 +624,7 @@ export const fordevSignup = async (req: Request, res: Response) => {
     }
 
 
-    const newUser = await prisma.user.create({
+    const newUser = await prisma.users.create({
       data: {
         name,
         email,
@@ -684,7 +684,7 @@ export const adminLogin = async (req: Request, res: Response): Promise<void> => 
     }
 
     // check if email and password are correct
-    const user = await prisma.user.findUnique({ where: { email } });
+    const user = await prisma.users.findUnique({ where: { email } });
     if (!user) {
       res.status(401).json({ success: false, message: "Invalid credentials" });
       return;
@@ -743,7 +743,7 @@ export const verifyOTP = async (req: Request, res: Response): Promise<void> => {
       id: userCode.userId,
     }, process.env.JWT_SECRET as string, { expiresIn: "7d" });
 
-    const user = await prisma.user.findUnique({ where: { id: userCode.userId } });
+    const user = await prisma.users.findUnique({ where: { id: userCode.userId } });
     if (!user) {
       res.status(401).json({ success: false, message: "Invalid credentials" });
       return;
@@ -772,7 +772,7 @@ export const resendOTP = async (req: Request, res: Response): Promise<void> => {
   try {
     const { email } = req.body;
 
-    const user = await prisma.user.findFirst({ where: { email } });
+    const user = await prisma.users.findFirst({ where: { email } });
     if (!user) {
       res.status(401).json({ success: false, message: "Invalid credentials" });
       return;

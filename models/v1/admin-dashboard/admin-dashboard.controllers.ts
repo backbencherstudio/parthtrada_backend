@@ -7,9 +7,9 @@ const prisma = new PrismaClient();
 export const dashboard = async (req: Request, res: Response): Promise<void> => {
   try {
     const [totalUsers, studentCount, expertCount, totalSessions,] = await Promise.all([
-      prisma.user.count(),
-      prisma.user.count({ where: { activeProfile: "STUDENT" } }),
-      prisma.user.count({ where: { activeProfile: "EXPERT" } }),
+      prisma.users.count(),
+      prisma.users.count({ where: { activeProfile: "STUDENT" } }),
+      prisma.users.count({ where: { activeProfile: "EXPERT" } }),
       prisma.booking.count(),
       // prisma.transaction.aggregate({
       //   where: { status: TransactionStatus.SUCCESS },
@@ -40,7 +40,7 @@ export const dashboard = async (req: Request, res: Response): Promise<void> => {
     });
 
     // Get latest 4 users
-    const latestUsers = await prisma.user.findMany({
+    const latestUsers = await prisma.users.findMany({
       orderBy: { createdAt: 'desc' },
       take: 4,
       select: {
@@ -52,7 +52,7 @@ export const dashboard = async (req: Request, res: Response): Promise<void> => {
     });
 
     // Get latest 4 experts with details
-    const latestExpertsRaw = await prisma.user.findMany({
+    const latestExpertsRaw = await prisma.users.findMany({
       where: { activeProfile: "EXPERT" },
       orderBy: { createdAt: 'desc' },
       take: 4,
@@ -165,8 +165,8 @@ export const dashboardUsersList = async (req: Request, res: Response): Promise<v
     }
 
     const [totalUsers, users] = await Promise.all([
-      prisma.user.count({ where }),
-      prisma.user.findMany({
+      prisma.users.count({ where }),
+      prisma.users.findMany({
         skip,
         take: Number(limit),
         orderBy: { createdAt: 'desc' },
@@ -227,8 +227,8 @@ export const dashboardExpertsList = async (req: Request, res: Response): Promise
     }
 
     const [totalExperts, expertsRaw] = await Promise.all([
-      prisma.user.count({ where }),
-      prisma.user.findMany({
+      prisma.users.count({ where }),
+      prisma.users.findMany({
         skip,
         take: Number(limit),
         orderBy: { createdAt: 'desc' }, // fallback order

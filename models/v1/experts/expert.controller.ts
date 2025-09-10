@@ -347,7 +347,7 @@ export const createMeetingLink = async (req: AuthenticatedRequest, res: Response
         startTime: booking.date,
         duration: booking.sessionDuration, // expecting minutes
         agenda: booking.sessionDetails as string,
-        timezone: booking.expert?.timeZone || "UTC",
+        timezone: booking.expert?.timezone || "UTC",
       });
       // console.log("meetingLink", zoomMeeting)
       meetingLink = zoomMeeting.join_url;

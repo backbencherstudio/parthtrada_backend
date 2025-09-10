@@ -16,7 +16,7 @@ export const verifyAdmin = async (
   }
 
   // Check if the user exists and has ADMIN role 
-  const adminUser = await prisma.user.findUnique({ where: { email } });
+  const adminUser = await prisma.users.findUnique({ where: { email } });
   if (!adminUser || adminUser.activeProfile !== "ADMIN") {
     res.status(403).json({ message: "Access denied" });
     return;

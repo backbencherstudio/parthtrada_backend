@@ -80,11 +80,11 @@ export const getChatRoom = async (req: AuthenticatedRequest, res: Response) => {
 
     // Get both users' profiles
     const [currentUser, otherUser] = await Promise.all([
-      prisma.user.findUnique({
+      prisma.users.findUnique({
         where: { id: userId },
         include: { studentProfile: true, expertProfile: true },
       }),
-      prisma.user.findUnique({
+      prisma.users.findUnique({
         where: { id: otherUserId },
         include: { studentProfile: true, expertProfile: true },
       }),
@@ -333,7 +333,7 @@ export const getChatList = async (
     const userId = req.user?.id;
 
     // Get user's profile
-    const user = await prisma.user.findUnique({
+    const user = await prisma.users.findUnique({
       where: { id: userId },
       include: {
         studentProfile: true,
@@ -615,7 +615,7 @@ export const getUnreadCount = async (
     const userId = req.user?.id;
 
     // Get user's profile
-    const user = await prisma.user.findUnique({
+    const user = await prisma.users.findUnique({
       where: { id: userId },
       include: {
         studentProfile: true,
