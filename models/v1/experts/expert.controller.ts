@@ -98,44 +98,150 @@ export const index = async (req: Request, res: Response) => {
 
 export const getExpertById = async (req: Request, res: Response) => {
   try {
-    const id = req.params?.id
-
+    const id = req.params?.id;
     if (!id) {
-      res.status(400).json({
-        success: false,
-        message: 'Please provide expert ID.',
-      })
-      return
+      return res.status(400).json({ success: false, message: "Please provide expert ID." });
     }
 
-    const expert = await prisma.expertProfile.findFirst({
+    // Get expert profile + user info
+    const expert = await prisma.expertProfile.findUnique({
       where: { id },
-      include: { user: { select: { name: true, email: true, image: true } } }
+      include: {
+        user: {
+          select: {
+            name: true,
+            email: true,
+            image: true,
+          },
+        },
+      },
     });
 
     if (!expert) {
-      res.status(404).json({
-        success: false,
-        message: 'Expert not found.',
-      })
-      return
+      return res.status(404).json({ success: false, message: "Expert not found." });
     }
 
-    res.status(200).json({
+    // Aggregate review stats directly from Review model
+    const grouped = await prisma.review.groupBy({
+      by: ["rating"],
+      where: { expertId: expert.userId },
+      _count: { rating: true },
+    });
+
+    const totalReviews = grouped.reduce((sum, g) => sum + g._count.rating, 0);
+    const ratingCounts: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+    for (const g of grouped) ratingCounts[g.rating] = g._count.rating;
+
+    const averageRating =
+      totalReviews > 0
+        ? (
+          Object.entries(ratingCounts).reduce(
+            (sum, [rating, count]) => sum + Number(rating) * count,
+            0
+          ) / totalReviews
+        ).toFixed(2)
+        : null;
+
+    const ratingDistribution = Object.entries(ratingCounts)
+      .map(([rating, count]) => ({
+        rating: Number(rating),
+        count,
+        percentage: totalReviews > 0 ? ((count / totalReviews) * 100).toFixed(2) : "0.00",
+      }))
+      .reverse();
+
+    return res.status(200).json({
       success: true,
-      message: 'Expert fetched successfully.',
-      data: expert,
-    })
+      message: "Expert fetched successfully.",
+      data: {
+        expert: {
+          id: expert.id,
+          profession: expert.profession,
+          organization: expert.organization,
+          location: expert.location,
+          description: expert.description,
+          experience: expert.experience,
+          hourlyRate: expert.hourlyRate,
+          skills: expert.skills,
+          availableDays: expert.availableDays,
+          availableTime: expert.availableTime,
+          user: expert.user,
+        },
+        stats: {
+          totalReviews,
+          averageRating,
+          ratingDistribution,
+        },
+      },
+    });
   } catch (error) {
-    console.error('Error getting expert:', error?.message)
-    res.status(500).json({
+    console.error("Error getting expert:", error?.message);
+    return res.status(500).json({
       success: false,
       message: "Failed to get expert.",
       error: error instanceof Error ? error.message : "Internal server error",
     });
-    return
   }
-}
+};
+
+export const getExpertReviews = async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const id = req.params?.id;
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 5;
+
+    if (!id) {
+      return res.status(400).json({ success: false, message: "Please provide expert ID." });
+    }
+
+    const expertProfile = await prisma.expertProfile.findUnique({ where: { id } });
+    if (!expertProfile) {
+      return res.status(404).json({ success: false, message: "Expert not found." });
+    }
+
+    const userId = expertProfile.userId;
+
+    const [totalReviews, reviews] = await Promise.all([
+      prisma.review.count({ where: { expertId: userId } }),
+      prisma.review.findMany({
+        where: { expertId: userId },
+        include: {
+          student: { select: { name: true, image: true } },
+          booking: { select: { date: true } },
+        },
+        orderBy: { createdAt: "desc" },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+    ]);
+
+    return res.status(200).json({
+      success: true,
+      message: "Reviews fetched successfully.",
+      data: {
+        page,
+        limit,
+        total: totalReviews,
+        items: reviews.map((r) => ({
+          id: r.id,
+          rating: r.rating,
+          description: r.description,
+          createdAt: r.createdAt,
+          student: r.student,
+          sessionDate: r.booking?.date,
+        })),
+      },
+    });
+  } catch (error) {
+    console.error("Error getting reviews:", error?.message);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to get reviews.",
+      error: error instanceof Error ? error.message : "Internal server error",
+    });
+  }
+};
+
 
 export const acceptRejectBooking = async (req: AuthenticatedRequest, res: Response) => {
   try {
