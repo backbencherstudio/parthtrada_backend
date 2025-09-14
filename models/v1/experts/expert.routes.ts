@@ -1,11 +1,12 @@
 import { Router } from 'express';
-import { acceptRejectBooking, createMeetingLink, expertSchedule, getExpertById, getExpertReviews, getExpertSkills, index, markSessionCompleted } from './expert.controller';
+import { acceptRejectBooking, createMeetingLink, expertSchedule, getExpertById, getExpertReviews, getExpertSkills, getReviews, index, markSessionCompleted } from './expert.controller';
 import { verifyUser } from '@/middleware/verifyUsers';
 
 const router = Router();
 
 router.get('/', verifyUser('ANY'), index)
 router.get('/skills', verifyUser('ANY'), getExpertSkills)
+router.get('/reviews', verifyUser('ANY'), getReviews)
 router.get('/:id', verifyUser('ANY'), getExpertById)
 router.get('/:id/reviews', verifyUser('ANY'), getExpertReviews)
 

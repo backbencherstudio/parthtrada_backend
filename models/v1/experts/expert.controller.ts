@@ -283,6 +283,45 @@ export const getExpertSkills = async (req: AuthenticatedRequest, res: Response) 
   }
 };
 
+export const getReviews = async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const reviews = await prisma.review.findMany({
+      select: {
+        id: true,
+        rating: true,
+        description: true,
+        createdAt: true,
+        updatedAt: true,
+        student: {
+          select: {
+            id: true,
+            name: true,
+            image: true,
+            studentProfile: true
+          }
+        }
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+      take: 10,
+    });
+
+    res.json({
+      success: true,
+      message: "Reviews fetched successfully.",
+      data: reviews,
+    });
+  } catch (error) {
+    console.error("Error getting reviews:", error?.message);
+    res.status(500).json({
+      success: false,
+      message: "Failed to get reviews.",
+      error: error instanceof Error ? error.message : "Internal server error",
+    });
+  }
+};
+
 
 export const acceptRejectBooking = async (req: AuthenticatedRequest, res: Response) => {
   try {
