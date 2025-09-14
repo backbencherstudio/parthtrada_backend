@@ -242,6 +242,47 @@ export const getExpertReviews = async (req: AuthenticatedRequest, res: Response)
   }
 };
 
+export const getExpertSkills = async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    function normalizeSkill(skill: string) {
+      return skill
+        .trim()
+        .toLowerCase()
+        .replace(/\s+/g, ' ')
+        .replace(/s$/, '');
+    }
+
+    const experts = await prisma.expertProfile.findMany({
+      select: { skills: true }
+    });
+
+    const normalizedMap = new Map<string, string>();
+
+    for (const skill of experts.flatMap(e => e.skills)) {
+      const key = normalizeSkill(skill);
+      if (!normalizedMap.has(key)) {
+        normalizedMap.set(key, skill.trim());
+      }
+    }
+
+    const uniqueSkills = Array.from(normalizedMap.values());
+
+    res.json({
+      success: true,
+      message: "Skills fetched successfully.",
+      data: uniqueSkills,
+    });
+    return
+  } catch (error) {
+    console.error("Error getting skills:", error?.message);
+    res.status(500).json({
+      success: false,
+      message: "Failed to get skills.",
+      error: error instanceof Error ? error.message : "Internal server error",
+    });
+  }
+};
+
 
 export const acceptRejectBooking = async (req: AuthenticatedRequest, res: Response) => {
   try {
