@@ -103,15 +103,16 @@ export const getExpertById = async (req: Request, res: Response) => {
       return res.status(400).json({ success: false, message: "Please provide expert ID." });
     }
 
-    // Get expert profile + user info
     const expert = await prisma.expertProfile.findUnique({
       where: { id },
       include: {
         user: {
           select: {
+            id: true,
             name: true,
             email: true,
             image: true,
+            studentProfile: true,
           },
         },
       },
@@ -150,6 +151,19 @@ export const getExpertById = async (req: Request, res: Response) => {
       }))
       .reverse();
 
+    const studentCount = await prisma.booking.groupBy({
+      by: ['studentId'],
+      where: {
+        expertId: expert.userId,
+        studentId: { not: null },
+      },
+      _count: {
+        studentId: true,
+      },
+    });
+
+    const totalStudents = studentCount.length;
+
     return res.status(200).json({
       success: true,
       message: "Expert fetched successfully.",
@@ -171,6 +185,7 @@ export const getExpertById = async (req: Request, res: Response) => {
           totalReviews,
           averageRating,
           ratingDistribution,
+          totalStudents,
         },
       },
     });

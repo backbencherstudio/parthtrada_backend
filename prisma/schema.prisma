@@ -144,6 +144,7 @@ model Message {
   senderId   String
   chatRoomId String
   isRead     Boolean  @default(false)
+  isAI       Boolean  @default(false)
   createdAt  DateTime @default(now())
   chatRoom   ChatRoom @relation(fields: [chatRoomId], references: [id], onDelete: Cascade)
 }

@@ -12,6 +12,7 @@ import expertRoutes from "./models/v1/experts/expert.routes";
 import paymentRoutes from "./models/v1/payments/payment.routes";
 import profileRoutes from "./models/v1/profile/profile.routes";
 import reviewRoutes from "./models/v1/reviews/reviews.routes";
+import aiRoutes from "./models/v1/ai-assistant/ai.routes";
 import { setupIntent } from "./models/v1/booking/booking.controllers";
 
 const app = express();
@@ -47,6 +48,7 @@ app.use("/home", homeRoutes);
 app.use("/experts", expertRoutes);
 app.use("/payments", paymentRoutes);
 app.use("/reviews", reviewRoutes);
+app.use("/ai", aiRoutes);
 
 
 // For testing add ejs
