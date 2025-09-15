@@ -147,7 +147,7 @@ export const getExpertById = async (req: Request, res: Response) => {
       .map(([rating, count]) => ({
         rating: Number(rating),
         count,
-        percentage: totalReviews > 0 ? ((count / totalReviews) * 100).toFixed(2) : "0.00",
+        percentage: totalReviews > 0 ? ((count / totalReviews)).toFixed(2) : "0.00",
       }))
       .reverse();
 

@@ -27,56 +27,71 @@ Respond as a helpful assistant:
 }
 
 export async function parseStudentQuery(query: string) {
-    // Input validation
     if (!query || typeof query !== 'string' || query.trim() === '') {
         return { intent: 'Unknown', parameters: {} };
     }
 
     const prompt = `
-You are an AI assistant for a tutoring app. Your task is to analyze a user's query and determine their intent and relevant parameters.
-- Your ONLY output must be valid JSON.
-- Do NOT include any explanations or additional text outside the JSON.
-- Valid intents are: "FAQ", "Booking", "Reviews", "Payments", or "Unknown".
-- Include relevant parameters extracted from the query in the "parameters" object.
-- If no specific parameters can be extracted, return an empty parameters object.
-- If the intent cannot be determined, return {"intent":"Unknown","parameters":{}}
+You are an AI assistant for a tutoring app connecting students with experts.
+Your task is to analyze a user's query and return their intent and any relevant parameters as a JSON object.
+DO NOT include explanations, thoughts, or extra text—ONLY output a single valid JSON object.
 
-Return format:
-{"intent":"FAQ|Booking|Reviews|Payments|Unknown","parameters":{...}}
+Valid intents: "FAQ", "Booking", "Reviews", "Payments", "Unknown".
 
+Rules:
+1. Treat any query where the user wants to find, search for, or book experts (with or without a specific date or skill) as a "Booking" intent.
+2. Extract parameters for each intent if present:
+   - "Booking": { "skill": string, "date": string (YYYY-MM-DD) }
+   - "Reviews": { "expertId": string }
+   - "Payments": { "studentId": string }
+   - "FAQ": {}
+3. Omit any parameter that cannot be determined from the query.
+4. If the intent cannot be determined, return: {"intent":"Unknown","parameters":{}}
+5. Always return the JSON object in this exact format:
+   {"intent":"FAQ|Booking|Reviews|Payments|Unknown","parameters":{...}}
+
+Examples:
+User query: "Find experts with Machine Learning skills on next day"
+{"intent":"Booking","parameters":{"skill":"Machine Learning","date":"<tomorrow's date in YYYY-MM-DD>"}}
+
+User query: "I want to book a Python expert for tomorrow"
+{"intent":"Booking","parameters":{"skill":"Python","date":"<tomorrow's date in YYYY-MM-DD>"}}
+
+User query: "How do I pay for a session?"
+{"intent":"FAQ","parameters":{}}
+
+User query: "Show me reviews for expert 123"
+{"intent":"Reviews","parameters":{"expertId":"123"}}
+
+User query: "What's my payment history?"
+{"intent":"Payments","parameters":{}}
+
+User query: "Just saying hi"
+{"intent":"Unknown","parameters":{}}
+
+Now analyze this query:
 User query: "${query.trim()}"
 `;
 
     try {
-        const result = await callOllama(prompt, 200);
+        const response = await callOllama(prompt, 1000);
 
-        // Check if result is valid
-        if (!result) {
+        if (!response) {
             return { intent: 'Unknown', parameters: {} };
         }
 
-
-        console.log('=============result=======================');
-        console.log(JSON.stringify(result));
+        console.log('=================response===================');
+        console.log(response);
         console.log('====================================');
 
-        // Parse the result
-        const parsedResult = JSON.parse(result);
-
-
-        console.log('=============parsedResult=======================');
-        console.log(parsedResult);
-        console.log('====================================');
-
-        // Validate the parsed result structure
-        if (!parsedResult.intent || !['FAQ', 'Booking', 'Reviews', 'Payments', 'Unknown'].includes(parsedResult.intent)) {
-            return { intent: 'Unknown', parameters: {} };
+        const jsonMatches = response.match(/\{[\s\S]*?\}/g);
+        let jsonString = '';
+        if (jsonMatches && jsonMatches.length > 0) {
+            jsonString = jsonMatches[jsonMatches.length - 1];
         }
-        if (!parsedResult.parameters || typeof parsedResult.parameters !== 'object') {
-            parsedResult.parameters = {};
-        }
+        const result = JSON.parse(jsonString + '}')
 
-        return parsedResult;
+        return result;
     } catch (err) {
         console.error('Error processing query:', {
             query,
