@@ -6,44 +6,65 @@ const prisma = new PrismaClient();
 
 export const myProfile = async (req: AuthenticatedRequest, res: Response) => {
     try {
-        const user = await prisma.users.findUnique({
-            where: { id: req.user?.id },
-            select: {
-                id: true,
-                linkedInId: true,
-                name: true,
-                email: true,
-                password: false,
-                lastLogin: true,
-                image: true,
-                activeProfile: true,
-                timezone: true,
-                createdAt: true,
-                updatedAt: true
-            }
-        });
-
-        if (!user) {
+        if (!req.user?.id || !req.user?.activeProfile) {
             return res.status(401).json({
                 success: false,
                 message: "Unauthorized.",
             });
         }
 
-        res.status(200).json({
+        // Dynamically select profile based on activeProfile
+        const includeProfile =
+            req.user.activeProfile === "STUDENT"
+                ? { studentProfile: true }
+                : { expertProfile: true };
+
+        const user = await prisma.users.findUnique({
+            where: { id: req.user.id },
+            select: {
+                id: true,
+                linkedInId: true,
+                name: true,
+                email: true,
+                lastLogin: true,
+                image: true,
+                activeProfile: true,
+                timezone: true,
+                createdAt: true,
+                updatedAt: true,
+                ...includeProfile,
+            },
+        });
+
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: "User not found.",
+            });
+        }
+
+        // Shape response data
+        const { studentProfile, expertProfile, ...baseData } = user;
+        const data = {
+            ...baseData,
+            meta: req.user.activeProfile === "STUDENT" ? studentProfile : expertProfile,
+        };
+
+        return res.status(200).json({
             success: true,
-            message: 'Authenticated',
-            data: user
+            message: "Authenticated.",
+            data,
         });
     } catch (error) {
-        console.error("Error getting authenticated profile:", error);
-        res.status(500).json({
+        console.error("Error fetching authenticated profile:", error);
+        return res.status(500).json({
             success: false,
             message: "Failed to get authenticated profile.",
             error: error instanceof Error ? error.message : "Internal server error",
         });
     }
-}
+};
+
 
 type Payload = {
     [key: string]: string | number | string[] | boolean | null;

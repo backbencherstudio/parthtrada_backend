@@ -1,4 +1,4 @@
-import { Response } from "express";
+import { Request, Response } from "express";
 import { PrismaClient } from "@prisma/client";
 import Stripe from "stripe";
 import { AuthenticatedRequest } from "@/middleware/verifyUsers";
@@ -8,6 +8,29 @@ const prisma = new PrismaClient();
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2025-08-27.basil',
 });
+
+// for dev
+export const addCard = async (req: Request, res: Response) => {
+  const query = req.query
+
+  if (!query?.customer_id) {
+    return res.status(400).json({
+      success: false,
+      error: 'Plz provide customer_id'
+    })
+  }
+
+  const setup_intent = await stripe.setupIntents.create({
+    customer: query?.customer_id as string,
+    automatic_payment_methods: { enabled: true, allow_redirects: 'never' },
+  })
+
+  res.render("index", {
+    publishableKey: 'pk_test_51S39GcLenvrEQJkbVfvGzHLbGEVeTgpoJFGv6ZMw5vvai6r2HQrusGhuSRaBASSDlUc9Y1R293qKduPfhqPKwtEw00PRFjI7Xa',
+    clientSecret: setup_intent.client_secret,
+    customerId: query?.customer_id
+  });
+}
 
 export const savePaymentMethod = async (req: AuthenticatedRequest, res: Response) => {
   try {

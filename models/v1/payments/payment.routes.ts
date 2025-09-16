@@ -1,5 +1,5 @@
 import express, { Request, Response, Router } from 'express';
-import { balance, confirmPayment, payouts, refundTransaction, savePaymentMethod } from './payment.controller';
+import { addCard, balance, confirmPayment, payouts, refundTransaction, savePaymentMethod } from './payment.controller';
 import { verifyUser } from '@/middleware/verifyUsers';
 import { checkOnboardingStatus, createStripeAccount, getOnboardingLink, webhook } from './stripe.controllers';
 
@@ -7,6 +7,9 @@ const router = Router()
 
 router.post('/save-payment-method', savePaymentMethod)
 router.post("/confirm-payment", verifyUser("ANY"), confirmPayment);
+
+// for dev
+router.get('/add-card', addCard)
 
 // expert routes
 router.post("/experts/refund", verifyUser("EXPERT"), refundTransaction);

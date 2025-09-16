@@ -221,7 +221,7 @@ export const getExpertReviews = async (req: AuthenticatedRequest, res: Response)
       prisma.review.findMany({
         where: { expertId: userId },
         include: {
-          student: { select: { name: true, image: true } },
+          student: { select: { name: true, email: true, image: true } },
           booking: { select: { date: true } },
         },
         orderBy: { createdAt: "desc" },
