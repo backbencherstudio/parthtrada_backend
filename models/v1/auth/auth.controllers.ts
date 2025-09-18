@@ -9,6 +9,7 @@ import { v4 as uuidv4 } from "uuid";
 import { getImageUrl } from "../../../utils/base_utl";
 import { generateOTP, sendVerificationOTP } from "../../../utils/emailService.utils";
 import { updateUserSchema } from "@/utils/validations";
+import stripe from "@/services/stripe";
 
 dotenv.config();
 
@@ -100,7 +101,7 @@ export const linkedinCallback = async (req: Request, res: Response) => {
 
     let user = await prisma.users.findFirst({
       where: {
-        linkedInId: userInfo.sub,
+        linkedin_id: userInfo.sub,
       },
       include: {
         studentProfile: true,
@@ -114,7 +115,7 @@ export const linkedinCallback = async (req: Request, res: Response) => {
 
       user = await prisma.users.create({
         data: {
-          linkedInId: userInfo.sub,
+          linkedin_id: userInfo.sub,
           name: userInfo.name,
           email: userInfo.email,
           image: savedImagePath || userInfo.picture,
@@ -125,6 +126,24 @@ export const linkedinCallback = async (req: Request, res: Response) => {
           expertProfile: true,
         },
       });
+
+      const customer = await stripe.customers.create({
+        name: userInfo.name,
+        email: userInfo.email,
+        metadata: {
+          user_id: user.id,
+        },
+        description: 'New Customer',
+      })
+
+      await prisma.users.update({
+        where: {
+          id: user.id
+        },
+        data: {
+          customer_id: customer.id
+        }
+      })
     }
 
     const token = jwt.sign(
@@ -629,7 +648,7 @@ export const fordevSignup = async (req: Request, res: Response) => {
         name,
         email,
         lastLogin: new Date(),
-        linkedInId: uuidv4(),
+        linkedin_id: uuidv4(),
       },
       include: {
         studentProfile: true,

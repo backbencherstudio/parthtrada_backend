@@ -76,6 +76,7 @@
         }
 
         // Send the saved payment method ID to your backend to attach/persist
+        // /payments/save-payment-method
         const resp = await fetch("http://localhost:4000/api/user-profile/cards", {
           method: "POST",
           headers: { "Content-Type": "application/json" },

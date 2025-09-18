@@ -1,6 +1,6 @@
 import { AuthenticatedRequest } from "@/middleware/verifyUsers";
 import { Response } from "express";
-import { Prisma, PrismaClient } from "@prisma/client";
+import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
@@ -23,7 +23,7 @@ export const myProfile = async (req: AuthenticatedRequest, res: Response) => {
             where: { id: req.user.id },
             select: {
                 id: true,
-                linkedInId: true,
+                linkedin_id: true,
                 name: true,
                 email: true,
                 lastLogin: true,
@@ -96,6 +96,9 @@ export const updateProfile = async (req: AuthenticatedRequest, res: Response) =>
 
         const body: Payload = req?.body;
 
+        if (!body) {
+            return res.status(400).json({ error: "Request body is required" });
+        }
         const currentUser = await prisma.users.findUnique({
             where: { id },
         });

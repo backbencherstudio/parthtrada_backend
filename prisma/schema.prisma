@@ -150,20 +150,20 @@ model Message {
 }
 
 model PaymentMethod {
-  id                    String  @id @default(cuid())
-  stripePaymentMethodId String  @unique
-  customerID            String  @unique
-  brand                 String?
-  last4                 String?
-  expMonth              Int?
-  expYear               Int?
-  userId                String
-  user                  Users   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id        String  @id @default(cuid())
+  provider  String
+  method_id String  @unique
+  brand     String?
+  last4     String?
+  expMonth  Int?
+  expYear   Int?
+  userId    String
+  user      Users   @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Users {
   id              String          @id @default(cuid())
-  linkedInId      String          @unique
+  linkedin_id     String          @unique
   name            String?
   email           String?         @unique
   password        String?
@@ -177,7 +177,8 @@ model Users {
   studentBookings Booking[]       @relation("StudentBookings")
   expertProfile   ExpertProfile?
   notifications   Notification[]
-  PaymentMethod   PaymentMethod[]
+  customer_id     String?
+  payment_methods PaymentMethod[]
   expertReviews   Review[]        @relation("ExpertReview")
   studentReviews  Review[]        @relation("StudentReview")
   studentProfile  StudentProfile?

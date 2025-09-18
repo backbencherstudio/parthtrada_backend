@@ -51,9 +51,9 @@ export const savePaymentMethod = async (req: AuthenticatedRequest, res: Response
 
     await prisma.paymentMethod.create({
       data: {
-        stripePaymentMethodId: data.paymentMethodId,
+        provider: data.provider,
+        method_id: data.paymentMethodId,
         userId,
-        customerID: data.customerId
       }
     })
 
@@ -112,9 +112,13 @@ export const confirmPayment = async (req: AuthenticatedRequest, res: Response) =
       try {
         const paymentIntent = await stripe.paymentIntents.retrieve(data.paymentIntentId);
 
-        const paymentMethod = await prisma.paymentMethod.findFirst({ where: { stripePaymentMethodId: data.paymentMethodId } })
+        const user = await prisma.users.findUnique({
+          where: {
+            id: userId
+          }
+        })
 
-        await stripe.paymentIntents.update(data.paymentIntentId, { customer: paymentMethod.customerID })
+        await stripe.paymentIntents.update(data.paymentIntentId, { customer: user.customer_id })
 
         if (paymentIntent.status === "requires_payment_method") {
           // Attach and confirm payment method
