@@ -1,38 +1,46 @@
 import { Request, Response } from "express";
 import { PrismaClient } from "@prisma/client";
-import Stripe from "stripe";
 import { AuthenticatedRequest } from "@/middleware/verifyUsers";
 import { confirmPaymentSchema, payoutsSchema, refundTransactionSchema, savePaymentMethodSchema } from "@/utils/validations";
+import stripe from "@/services/stripe";
 
 const prisma = new PrismaClient();
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2025-08-27.basil',
-});
 
 // for dev
 export const addCard = async (req: Request, res: Response) => {
-  const query = req.query
-
-  if (!query?.customer_id) {
-    return res.status(400).json({
-      success: false,
-      error: 'Plz provide customer_id'
-    })
-  }
-
-  const setup_intent = await stripe.setupIntents.create({
-    customer: query?.customer_id as string,
-    automatic_payment_methods: { enabled: true, allow_redirects: 'never' },
-  })
-
-  res.render("index", {
-    publishableKey: 'pk_test_51S39GcLenvrEQJkbVfvGzHLbGEVeTgpoJFGv6ZMw5vvai6r2HQrusGhuSRaBASSDlUc9Y1R293qKduPfhqPKwtEw00PRFjI7Xa',
-    clientSecret: setup_intent.client_secret,
-    customerId: query?.customer_id
-  });
+  res.render("index");
 }
 
-export const savePaymentMethod = async (req: AuthenticatedRequest, res: Response) => {
+export const createSetupIntent = async (req: Request, res: Response) => {
+  try {
+    // const user_id = req.user?.id;
+    const user_id = 'cmfqbs7700001vc80jr0s0uux';
+    const user = await prisma.users.findUnique({
+      where: {
+        id: user_id
+      }
+    })
+
+    const setup_intent = await stripe.setupIntents.create({
+      customer: user.customer_id,
+      automatic_payment_methods: { enabled: true, allow_redirects: 'never' },
+    })
+
+    return res.status(201).json({
+      success: true,
+      client_secret: setup_intent.client_secret
+    })
+
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to create setup intent",
+      error: error instanceof Error ? error.message : "Internal server error",
+    });
+  }
+}
+
+export const savePaymentMethod = async (req: Request, res: Response) => {
   try {
     const { data, error, success } = savePaymentMethodSchema.safeParse(req.body);
     if (!success) {
@@ -47,21 +55,38 @@ export const savePaymentMethod = async (req: AuthenticatedRequest, res: Response
       }
     }
 
-    const userId = req?.user?.id || 'cmf7vvg1q0000vc8okiad3mx0';
+    const userId = 'cmfqbs7700001vc80jr0s0uux';
+    const pm_id = data.paymentMethodId
+
+    console.log('===========pm id=========================');
+    console.log(pm_id);
+    console.log('====================================');
+
+    const paymentMethod = await stripe.paymentMethods.retrieve(data.paymentMethodId);
+
+    const payload = {
+      provider: data.provider,
+      method_id: paymentMethod.id,
+      userId,
+      brand: paymentMethod.card.brand,
+      expMonth: paymentMethod.card.exp_month,
+      expYear: paymentMethod.card.exp_year,
+      last4: paymentMethod.card.last4,
+    }
+
+    console.log('=======payload=============================');
+    console.log(payload);
+    console.log('====================================');
 
     await prisma.paymentMethod.create({
-      data: {
-        provider: data.provider,
-        method_id: data.paymentMethodId,
-        userId,
-      }
+      data: payload
     })
 
     return res.status(201).json({
       message: 'Payment Method Saved.'
     })
   } catch (error) {
-    return res.status(500).json({ message: 'Something went wrong.' })
+    return res.status(500).json({ success: false, message: 'Something went wrong.' })
   }
 }
 

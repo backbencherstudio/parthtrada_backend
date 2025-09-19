@@ -1,10 +1,11 @@
 import express, { Request, Response, Router } from 'express';
-import { addCard, balance, confirmPayment, payouts, refundTransaction, savePaymentMethod } from './payment.controller';
+import { addCard, balance, confirmPayment, createSetupIntent, payouts, refundTransaction, savePaymentMethod } from './payment.controller';
 import { verifyUser } from '@/middleware/verifyUsers';
 import { checkOnboardingStatus, createStripeAccount, getOnboardingLink, webhook } from './stripe.controllers';
 
 const router = Router()
 
+router.post('/create-setup-intent', createSetupIntent)
 router.post('/save-payment-method', savePaymentMethod)
 router.post("/confirm-payment", verifyUser("ANY"), confirmPayment);
 

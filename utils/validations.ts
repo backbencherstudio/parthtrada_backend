@@ -25,7 +25,6 @@ export const bookingSchema = z.object({
 export const savePaymentMethodSchema = z.object({
   provider: z.string().min(1, { error: 'Provider is required.' }),
   paymentMethodId: z.string().min(1, { error: 'Payment Method ID is required.' }),
-  customerId: z.string().min(1, { error: 'Customer ID is required.' }),
 });
 
 export const confirmPaymentSchema = z.object({
