@@ -89,7 +89,8 @@ export const create = async (req: AuthenticatedRequest, res: Response) => {
       },
     });
 
-    const amountInCents = Math.round(calculateSlotAmount(expert.hourlyRate, data.sessionDuration) * 100);
+    const amount = calculateSlotAmount(expert.hourlyRate, data.sessionDuration)
+    const amountInCents = Math.round(amount * 100);
     const platformFee = Math.round(amountInCents * 0.1);
 
     const paymentIntent = await stripe.paymentIntents.create({
@@ -112,7 +113,7 @@ export const create = async (req: AuthenticatedRequest, res: Response) => {
     await prisma.transaction.create({
       data: {
         bookingId: booking.id,
-        amount: calculateSlotAmount(expert.hourlyRate, data.sessionDuration),
+        amount: amount,
         currency: data.currency,
         provider: "STRIPE",
         providerId: paymentIntent.id,
@@ -125,7 +126,7 @@ export const create = async (req: AuthenticatedRequest, res: Response) => {
       message: "Booking Request sent successfully",
       data: {
         bookingId: booking.id,
-        amount: calculateSlotAmount(expert.hourlyRate, data.sessionDuration),
+        amount: amount,
         paymentIntentId: paymentIntent.id,
       },
     });
