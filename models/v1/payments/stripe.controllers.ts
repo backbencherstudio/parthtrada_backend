@@ -153,6 +153,30 @@ export const checkOnboardingStatus = async (
   }
 };
 
+export const updateOnboardStatus = async (req: Request, res: Response) => {
+  try {
+    const account_id = req.params.id
+    await prisma.expertProfile.update({
+      where: {
+        stripeAccountId: account_id
+      },
+      data: {
+        isOnboardCompleted: true
+      }
+    })
+    return res.status(200).json({
+      success: true,
+      message: 'Status updated.',
+      account_id
+    })
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: 'Something went wrong.'
+    })
+  }
+}
+
 export const webhook = async (req: Request, res: Response) => {
   let event = req.body;
   switch (event.type) {

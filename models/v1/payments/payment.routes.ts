@@ -1,12 +1,13 @@
 import express, { Request, Response, Router } from 'express';
-import { addCard, balance, confirmPayment, createSetupIntent, payouts, refundTransaction, savePaymentMethod } from './payment.controller';
+import { addCard, balance, confirmPayment, createSetupIntent, getCards, payouts, refundTransaction, savePaymentMethod } from './payment.controller';
 import { verifyUser } from '@/middleware/verifyUsers';
-import { checkOnboardingStatus, createStripeAccount, getOnboardingLink, webhook } from './stripe.controllers';
+import { checkOnboardingStatus, createStripeAccount, getOnboardingLink, updateOnboardStatus, webhook } from './stripe.controllers';
 
 const router = Router()
 
 router.post('/create-setup-intent', createSetupIntent)
 router.post('/save-payment-method', savePaymentMethod)
+router.get('/cards', verifyUser('ANY'), getCards)
 router.post("/confirm-payment", verifyUser("ANY"), confirmPayment);
 
 // for dev
@@ -21,6 +22,7 @@ router.post("/experts/payouts", verifyUser("EXPERT"), payouts);
 router.post("/stripe/create-account", verifyUser("ANY"), createStripeAccount);
 router.get("/stripe/onboarding-link", verifyUser("ANY"), getOnboardingLink);
 router.get("/stripe/status", verifyUser("ANY"), checkOnboardingStatus);
+router.get('/stripe/account/success/:id', updateOnboardStatus)
 
 // Stripe Webhook
 router.post('/webhook', express.raw({ type: 'application/json' }), webhook)

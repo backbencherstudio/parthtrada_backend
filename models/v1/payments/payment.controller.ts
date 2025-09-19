@@ -14,7 +14,7 @@ export const addCard = async (req: Request, res: Response) => {
 export const createSetupIntent = async (req: Request, res: Response) => {
   try {
     // const user_id = req.user?.id;
-    const user_id = 'cmfqbs7700001vc80jr0s0uux';
+    const user_id = 'cmfqhg38d0000vcewcw00fcwk';
     const user = await prisma.users.findUnique({
       where: {
         id: user_id
@@ -55,14 +55,10 @@ export const savePaymentMethod = async (req: Request, res: Response) => {
       }
     }
 
-    const userId = 'cmfqbs7700001vc80jr0s0uux';
+    const userId = 'cmfqhg38d0000vcewcw00fcwk';
     const pm_id = data.paymentMethodId
 
-    console.log('===========pm id=========================');
-    console.log(pm_id);
-    console.log('====================================');
-
-    const paymentMethod = await stripe.paymentMethods.retrieve(data.paymentMethodId);
+    const paymentMethod = await stripe.paymentMethods.retrieve(pm_id);
 
     const payload = {
       provider: data.provider,
@@ -74,10 +70,6 @@ export const savePaymentMethod = async (req: Request, res: Response) => {
       last4: paymentMethod.card.last4,
     }
 
-    console.log('=======payload=============================');
-    console.log(payload);
-    console.log('====================================');
-
     await prisma.paymentMethod.create({
       data: payload
     })
@@ -87,6 +79,28 @@ export const savePaymentMethod = async (req: Request, res: Response) => {
     })
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Something went wrong.' })
+  }
+}
+
+export const getCards = async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const user_id = req?.user?.id
+    const cards = await prisma.paymentMethod.findMany({
+      where: {
+        userId: user_id
+      }
+    })
+    return res.status(201).json({
+      success: true,
+      message: 'Cards fetched successfully.',
+      data: cards
+    })
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to confirm payment",
+      error: error instanceof Error ? error.message : "Internal server error",
+    });
   }
 }
 

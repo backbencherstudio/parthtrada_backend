@@ -41,7 +41,7 @@ model ExpertProfile {
   skills             String[]
   availableDays      String[]
   availableTime      String[]
-  stripeAccountId    String?
+  stripeAccountId    String?    @unique
   isOnboardCompleted Boolean    @default(false)
   userId             String     @unique
   chatRoomsAsExpert  ChatRoom[] @relation("ExpertProfileToChatRoom")
@@ -86,7 +86,7 @@ model Transaction {
   referenceNumber String?           @map("reference_number")
   rawStatus       String?           @map("raw_status")
   status          PaymentStatus?    @default(PENDING)
-  amount          Decimal?
+  amount          Float?
   currency        String?
   paidAmount      Decimal?          @map("paid_amount")
   paidCurrency    String?           @map("paid_currency")
