@@ -18,7 +18,7 @@ export const bookingSchema = z.object({
     .regex(/^([01]\d|2[0-3]):([0-5]\d)$/, "Time must be in HH:mm format"),
   sessionDuration: z.number(),
   sessionDetails: z.string().optional(),
-  amount: z.number()
+  currency: z.string()
 });
 
 

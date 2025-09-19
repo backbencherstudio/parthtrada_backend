@@ -656,6 +656,24 @@ export const fordevSignup = async (req: Request, res: Response) => {
       },
     });
 
+    const customer = await stripe.customers.create({
+      name: newUser.name,
+      email: newUser.email,
+      metadata: {
+        user_id: newUser.id,
+      },
+      description: 'New Customer create from e-learning app.',
+    })
+
+    await prisma.users.update({
+      where: {
+        id: newUser.id
+      },
+      data: {
+        customer_id: customer.id
+      }
+    })
+
     const token = jwt.sign(
       {
         id: newUser.id,

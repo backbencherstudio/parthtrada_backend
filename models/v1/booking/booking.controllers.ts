@@ -6,6 +6,7 @@ import moment from 'moment-timezone'
 import { createZoomMeeting } from "@/utils/zoom.utils";
 import { bookingSchema } from "@/utils/validations";
 import { bookingsQuerySchema } from "@/utils/queryValidation";
+import calculateSlotAmount from "@/utils/calculate-slot-amount";
 
 const prisma = new PrismaClient();
 
@@ -43,31 +44,25 @@ export const create = async (req: AuthenticatedRequest, res: Response) => {
       return;
     }
 
-    // get the student user details
     const student = await prisma.users.findUnique({
       where: { id: userId },
     });
 
-    // Combine date and time to create a complete datetime string
     const expertDateTime = `${data.date} ${data.time}`;
 
-    // Fetch time-zone strings from the user records (should be valid IANA tz names)
     const expertTimeZone = expert?.user?.timezone || "UTC";
     const studentTimeZone = student?.timezone || "UTC";
 
-    // Create a moment object in the expert's time zone
     const expertMoment = moment.tz(expertDateTime, "YYYY-MM-DD hh:mm a", expertTimeZone);
 
-    // Convert the moment to the student's time zone
     const studentMoment = expertMoment.clone().tz(studentTimeZone);
 
-    // generate zoom meeting
     let meetingLink: string | undefined;
     try {
       const zoomMeeting = await createZoomMeeting({
         topic: `Session with ${student?.name ?? 'Student'}`,
         startTime: expertMoment.toDate(),
-        duration: data.sessionDuration, // expecting minutes
+        duration: data.sessionDuration,
         agenda: data.sessionDetails,
         timezone: expertTimeZone,
       });
@@ -81,7 +76,6 @@ export const create = async (req: AuthenticatedRequest, res: Response) => {
       return;
     }
 
-    // Create new booking record
     const booking = await prisma.booking.create({
       data: {
         studentId: userId,
@@ -95,20 +89,19 @@ export const create = async (req: AuthenticatedRequest, res: Response) => {
       },
     });
 
-    // Calculate platform fee (10%)
-    const amountInCents = Math.round(data.amount * 100);
+    const amountInCents = Math.round(calculateSlotAmount(expert.hourlyRate, data.sessionDuration) * 100);
     const platformFee = Math.round(amountInCents * 0.1);
 
-    // Create a PaymentIntent that transfers the funds directly to the expert’s account
     const paymentIntent = await stripe.paymentIntents.create({
       amount: amountInCents,
-      currency: "usd",
+      currency: data.currency,
+      customer: student.customer_id,
       application_fee_amount: platformFee,
       transfer_data: {
-        destination: expert.stripeAccountId!,
+        destination: expert.stripeAccountId
       },
-      automatic_payment_methods: { enabled: true, allow_redirects: 'never' },
-      capture_method: "manual",
+      automatic_payment_methods: { enabled: true, allow_redirects: 'always' },
+      capture_method: 'manual',
       metadata: {
         bookingId: booking.id,
         studentId: userId!,
@@ -116,25 +109,23 @@ export const create = async (req: AuthenticatedRequest, res: Response) => {
       },
     });
 
-    // Record the transaction in the database
     await prisma.transaction.create({
       data: {
         bookingId: booking.id,
-        amount: data.amount,
-        currency: "usd",
+        amount: calculateSlotAmount(expert.hourlyRate, data.sessionDuration),
+        currency: data.currency,
         provider: "STRIPE",
         providerId: paymentIntent.id,
         status: "PENDING",
       },
     });
 
-    // Respond to the client with the PaymentIntent details so the student can complete payment
     return res.json({
       success: true,
       message: "Booking Request sent successfully",
       data: {
         bookingId: booking.id,
-        amount: data.amount,
+        amount: calculateSlotAmount(expert.hourlyRate, data.sessionDuration),
         paymentIntentId: paymentIntent.id,
       },
     });

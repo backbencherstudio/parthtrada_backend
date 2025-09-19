@@ -37,7 +37,7 @@ model ExpertProfile {
   location           String?
   description        String?
   experience         String?
-  hourlyRate         String?
+  hourlyRate         Int?
   skills             String[]
   availableDays      String[]
   availableTime      String[]
