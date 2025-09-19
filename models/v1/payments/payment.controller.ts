@@ -6,11 +6,6 @@ import stripe from "@/services/stripe";
 
 const prisma = new PrismaClient();
 
-// for dev
-export const addCard = async (req: Request, res: Response) => {
-  res.render("index");
-}
-
 export const createSetupIntent = async (req: Request, res: Response) => {
   try {
     // const user_id = req.user?.id;
@@ -40,7 +35,7 @@ export const createSetupIntent = async (req: Request, res: Response) => {
   }
 }
 
-export const savePaymentMethod = async (req: Request, res: Response) => {
+export const addCard = async (req: Request, res: Response) => {
   try {
     const { data, error, success } = savePaymentMethodSchema.safeParse(req.body);
     if (!success) {
