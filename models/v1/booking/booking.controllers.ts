@@ -235,15 +235,17 @@ export const expertIndex = async (req: AuthenticatedRequest, res: Response): Pro
     res.status(200).json({
       success: true,
       message: "Bookings fetched successfully",
-      data: bookings,
-      pagination: {
-        total,
-        page,
-        perPage,
-        totalPages: Math.ceil(total / perPage),
-        hasNextPage: page * perPage < total,
-        hasPrevPage: page > 1,
-      },
+      data: {
+        bookings,
+        pagination: {
+          total,
+          page,
+          perPage,
+          totalPages: Math.ceil(total / perPage),
+          hasNextPage: page * perPage < total,
+          hasPrevPage: page > 1,
+        },
+      }
     });
     return
   } catch (error) {

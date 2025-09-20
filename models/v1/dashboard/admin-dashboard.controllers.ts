@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
-// import { PrismaClient, TransactionStatus } from "@prisma/client";
 import { PrismaClient } from "@prisma/client";
+import { dashboardExpertsQuerySchema, sessionsQuerySchema, transactionsQuerySchema, usersQuerySchema } from "@/utils/queryValidation";
 
 const prisma = new PrismaClient();
 
@@ -11,10 +11,6 @@ export const dashboard = async (req: Request, res: Response): Promise<void> => {
       prisma.users.count({ where: { activeProfile: "STUDENT" } }),
       prisma.users.count({ where: { activeProfile: "EXPERT" } }),
       prisma.booking.count(),
-      // prisma.transaction.aggregate({
-      //   where: { status: TransactionStatus.SUCCESS },
-      //   _sum: { amount: true },
-      // }),
     ]);
 
     // percentage calculation
@@ -146,11 +142,20 @@ export const dashboard = async (req: Request, res: Response): Promise<void> => {
   }
 };
 
-
-export const dashboardUsersList = async (req: Request, res: Response): Promise<void> => {
+export const users = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { page = 1, limit = 10, search = '', role } = req.query;
-    const skip = (Number(page) - 1) * Number(limit);
+    const query = usersQuerySchema.safeParse(req.query);
+    if (!query.success) {
+      res.status(400).json({
+        success: false,
+        message: "Invalid pagination parameters",
+        errors: query.error.flatten().fieldErrors,
+      });
+      return
+    }
+
+    const { page, perPage, role, search } = query.data;
+    const skip = (page - 1) * perPage;
 
     // Build where clause
     let where: any = {};
@@ -160,15 +165,15 @@ export const dashboardUsersList = async (req: Request, res: Response): Promise<v
         { email: { contains: search, mode: 'insensitive' } },
       ];
     }
-    if (role && (role === 'STUDENT' || role === 'EXPERT')) {
+    if (role) {
       where.activeProfile = role;
     }
 
-    const [totalUsers, users] = await Promise.all([
+    const [total, users] = await Promise.all([
       prisma.users.count({ where }),
       prisma.users.findMany({
         skip,
-        take: Number(limit),
+        take: Number(perPage),
         orderBy: { createdAt: 'desc' },
         where,
         select: {
@@ -184,8 +189,15 @@ export const dashboardUsersList = async (req: Request, res: Response): Promise<v
     res.json({
       success: true,
       data: {
-        totalUsers,
         users,
+        pagination: {
+          total,
+          page,
+          perPage,
+          totalPages: Math.ceil(total / perPage),
+          hasNextPage: page * perPage < total,
+          hasPrevPage: page > 1,
+        },
       },
     });
   } catch (error) {
@@ -197,10 +209,22 @@ export const dashboardUsersList = async (req: Request, res: Response): Promise<v
   }
 };
 
-export const dashboardExpertsList = async (req: Request, res: Response): Promise<void> => {
+export const experts = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { page = 1, limit = 10, search = '', status, sortBy } = req.query;
-    const skip = (Number(page) - 1) * Number(limit);
+
+    const query = dashboardExpertsQuerySchema.safeParse(req.query);
+
+    if (!query.success) {
+      res.status(400).json({
+        success: false,
+        message: "Invalid pagination parameters",
+        errors: query.error.flatten().fieldErrors,
+      });
+      return
+    }
+
+    const { page, perPage, search, sortBy, status } = query.data;
+    const skip = (page - 1) * perPage;
 
     // Build where clause
     let where: any = { activeProfile: 'EXPERT' };
@@ -211,27 +235,18 @@ export const dashboardExpertsList = async (req: Request, res: Response): Promise
       ];
     }
 
-    // Map status filter to BookingStatus
-    let bookingStatus: any = undefined;
     if (status) {
-      if (status === 'upcoming') bookingStatus = 'UPCOMING';
-      else if (status === 'missed') bookingStatus = 'MISSED';
-      else if (status === 'complete') bookingStatus = 'COMPLETED';
-    }
-
-    // If status filter is present, filter experts who have at least one booking with that status
-    if (bookingStatus) {
       where.expertBookings = {
-        some: { status: bookingStatus }
+        some: { status: status }
       };
     }
 
-    const [totalExperts, expertsRaw] = await Promise.all([
+    const [total, expertsRaw] = await Promise.all([
       prisma.users.count({ where }),
       prisma.users.findMany({
         skip,
-        take: Number(limit),
-        orderBy: { createdAt: 'desc' }, // fallback order
+        take: Number(perPage),
+        orderBy: { createdAt: 'desc' },
         where,
         select: {
           id: true,
@@ -272,8 +287,15 @@ export const dashboardExpertsList = async (req: Request, res: Response): Promise
     res.json({
       success: true,
       data: {
-        totalExperts,
         experts,
+        pagination: {
+          total,
+          page,
+          perPage,
+          totalPages: Math.ceil(total / perPage),
+          hasNextPage: page * perPage < total,
+          hasPrevPage: page > 1,
+        },
       },
     });
   } catch (error) {
@@ -285,19 +307,29 @@ export const dashboardExpertsList = async (req: Request, res: Response): Promise
   }
 };
 
-
-export const dashboardSessionsList = async (req: Request, res: Response): Promise<void> => {
+export const sessions = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { page = 1, limit = 10, search = '', status } = req.query;
-    const skip = (Number(page) - 1) * Number(limit);
+
+    const query = sessionsQuerySchema.safeParse(req.query);
+
+    if (!query.success) {
+      res.status(400).json({
+        success: false,
+        message: "Invalid pagination parameters",
+        errors: query.error.flatten().fieldErrors,
+      });
+      return
+    }
+
+    const { page, perPage, search, status } = query.data;
+
+    const skip = (Number(page) - 1) * Number(perPage);
 
     // Build where clause
     let where: any = {};
     // Status filter
     if (status) {
-      if (status === 'upcoming') where.status = 'UPCOMING';
-      else if (status === 'missed') where.status = 'MISSED';
-      else if (status === 'completed') where.status = 'COMPLETED';
+      where.status = status
     }
     // Search filter (student or expert name)
     if (search) {
@@ -307,11 +339,11 @@ export const dashboardSessionsList = async (req: Request, res: Response): Promis
       ];
     }
 
-    const [totalSessions, sessions] = await Promise.all([
+    const [total, sessions] = await Promise.all([
       prisma.booking.count({ where }),
       prisma.booking.findMany({
         skip,
-        take: Number(limit),
+        take: Number(perPage),
         orderBy: { date: 'desc' },
         where,
         include: {
@@ -325,8 +357,15 @@ export const dashboardSessionsList = async (req: Request, res: Response): Promis
     res.json({
       success: true,
       data: {
-        totalSessions,
         sessions,
+        pagination: {
+          total,
+          page,
+          perPage,
+          totalPages: Math.ceil(total / perPage),
+          hasNextPage: page * perPage < total,
+          hasPrevPage: page > 1,
+        },
       },
     });
   } catch (error) {
@@ -338,23 +377,25 @@ export const dashboardSessionsList = async (req: Request, res: Response): Promis
   }
 };
 
-export const dashboardTransactionsList = async (req: Request, res: Response): Promise<void> => {
+export const transactions = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { page = 1, limit = 10, status, search = '' } = req.query;
-    const skip = (Number(page) - 1) * Number(limit);
+    const query = transactionsQuerySchema.safeParse(req.query);
 
-    // Map status filter to BookingStatus
-    let bookingStatusFilter: any = undefined;
-    if (status) {
-      if (status === 'pending') bookingStatusFilter = 'UPCOMING';
-      else if (status === 'complete') bookingStatusFilter = 'COMPLETED';
-      else if (status === 'refund') bookingStatusFilter = 'REFUNDED';
+    if (!query.success) {
+      res.status(400).json({
+        success: false,
+        message: "Invalid pagination parameters",
+        errors: query.error.flatten().fieldErrors,
+      });
+      return
     }
 
-    // Build where clause for transaction
+    const { page, perPage, search, status } = query.data;
+    const skip = (Number(page) - 1) * Number(perPage);
+
     let where: any = {};
-    if (bookingStatusFilter) {
-      where.booking = { status: bookingStatusFilter };
+    if (status) {
+      where.booking = { status: status };
     }
     if (search) {
       where.AND = where.AND || [];
@@ -366,11 +407,11 @@ export const dashboardTransactionsList = async (req: Request, res: Response): Pr
       });
     }
 
-    const [totalTransactions, transactions] = await Promise.all([
+    const [total, transactions] = await Promise.all([
       prisma.transaction.count({ where }),
       prisma.transaction.findMany({
         skip,
-        take: Number(limit),
+        take: Number(perPage),
         orderBy: { createdAt: 'desc' },
         where,
         include: {
@@ -398,8 +439,15 @@ export const dashboardTransactionsList = async (req: Request, res: Response): Pr
     res.json({
       success: true,
       data: {
-        totalTransactions,
         transactions: formattedTransactions,
+        pagination: {
+          total,
+          page,
+          perPage,
+          totalPages: Math.ceil(total / perPage),
+          hasNextPage: page * perPage < total,
+          hasPrevPage: page > 1,
+        },
       },
     });
   } catch (error) {
@@ -476,5 +524,3 @@ export const dashboardRefundsList = async (req: Request, res: Response): Promise
     });
   }
 };
-
-
