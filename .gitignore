@@ -21,3 +21,4 @@ Thumbs.db
 coverage/
 pnpm-lock.yaml
 prisma/migrations/*
+uploads/*

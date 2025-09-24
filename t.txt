@@ -1,0 +1,6 @@
+Based on the information provided, here is a clear answer suitable for the True Note App:\n\n**Answer:**\n\nOn 24 September 2025, there are two experts available with Machine Learning skills at Microsoft in Dhaka, Bangladesh. They are:\n\n1. **cmfqho2n50000vc7ct4prnt8w**: ABackend Developer specializing in Machine Learning.\n2. **cmfqluhti0004vco4yq5jkz9a**: Another Backend Developer with a strong focus on Machine Learning.\n\nBoth are available from Monday to Thursday, and both can work by 10:00 PM on September 24th.",
+
+\nTo find an expert with Machine Learning skills on September 24, 2025, at 7 PM, use this SQL query:\n\n```sql\nSELECT e.Name FROM students s\nJOIN experts e ON sExpertise = 'Machine Learning'\nWHERE date_between('2025-09-24', '2025-09-25') AND e.available_at = '2025-09-24 19:00' AND payments IS NULL;\n```\n\nThis will list all experts who have Machine Learning expertise available by that time."
+
+
+nBased on the database search results for September 24, 2025, at 9 AM with machine learning skills, I found an expert named Shubhdeep. He specializes in AI, has positive reviews, and is available for payment during that time.\n\n**Answer:**\n\nShubhdeep is a machine learning expert from India, known for his work in AI and machine learning. He has positive reviews on the True Note App and is available for payment at 9 AM on September 24, 2025

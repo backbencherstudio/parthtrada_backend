@@ -3,29 +3,62 @@ import axios from "axios";
 const OLLAMA_URL = "http://localhost:11434/api/generate";
 const MODEL_NAME = "deepseek-r1:1.5b";
 
+/**
+ * Call Ollama AI API with prompt
+ */
 async function callOllama(prompt: string, maxTokens = 500) {
     const response = await axios.post(OLLAMA_URL, {
         model: MODEL_NAME,
         prompt,
         stream: false,
-        options: {
-            num_predict: maxTokens
-        }
+        options: { num_predict: maxTokens },
     });
 
-    // The actual text is in response.data.response
+    console.log('============ollama response========================');
+    console.log(response.data.response?.trim());
+    console.log('====================================');
+
     return response.data.response?.trim();
 }
 
-export async function generateAIResponse(query: string, dbData: any) {
+/**
+ * Generate AI response based on query + DB data + optional chat context
+ */
+export async function generateAIResponse(query: string, dbData: any, chatContext: any[] = []) {
+    const contextText = chatContext
+        .map(msg => `${msg.isAI ? "AI" : "User"}: ${msg.content}`)
+        .join("\n");
+
     const prompt = `
-Student query: ${query}
-Database info: ${JSON.stringify(dbData)}
-Respond as a helpful assistant:
+You are an AI assistant for the True Note App, a premium platform connecting students with verified experts.
+You have access to the following database information about experts, reviews, and transactions:
+
+${JSON.stringify(dbData, null, 2)}
+
+Conversation history:
+${chatContext.map(msg => `${msg.isAI ? "AI" : "User"}: ${msg.content}`).join("\n")}
+
+Guidelines:
+
+1. ONLY use information available in the database above.
+2. DO NOT include explanations, thoughts, or <think> blocks.
+3. DO NOT make up names, skills, or reviews that are not in the database.
+4. DO NOT provide generic advice or speculate.
+5. If the database does not contain relevant information, respond ONLY with: "No data available for this query."
+6. Your response should be a direct, concise answer suitable for the student on the True Note App.
+7. NEVER include <think> or any reasoning steps in your output.
+
+User query: "${query}"
+Respond with a clear, direct answer based ONLY on the database above.
 `;
-    return await callOllama(prompt, 500);
+
+
+    return await callOllama(prompt, 2000);
 }
 
+/**
+ * Parse student query into structured intent and parameters
+ */
 export async function parseStudentQuery(query: string) {
     if (!query || typeof query !== 'string' || query.trim() === '') {
         return { intent: 'Unknown', parameters: {} };
@@ -80,16 +113,64 @@ User query: "${query.trim()}"
             return { intent: 'Unknown', parameters: {} };
         }
 
-        console.log('=================response===================');
-        console.log(response);
-        console.log('====================================');
-
+        // Extract the last valid JSON object from the response
         const jsonMatches = response.match(/\{[\s\S]*?\}/g);
-        let jsonString = '';
+        let result: any = { intent: 'Unknown', parameters: {} };
         if (jsonMatches && jsonMatches.length > 0) {
-            jsonString = jsonMatches[jsonMatches.length - 1];
+            for (let i = jsonMatches.length - 1; i >= 0; i--) {
+                try {
+                    result = JSON.parse(jsonMatches[i]);
+                    break;
+                } catch { /* skip invalid */ }
+            }
         }
-        const result = JSON.parse(jsonString + '}')
+
+        // Normalize parameters
+        if (result.intent === "Booking") {
+            // Skill synonyms
+            if (result.parameters.skill) {
+                const skill = String(result.parameters.skill).trim();
+                // Add more synonyms as needed
+                const skillMap: Record<string, string> = {
+                    "ml": "Machine Learning",
+                    "machine learning": "Machine Learning",
+                    "ML Expertise": "Machine Learning",
+                    "python": "Python",
+                };
+                const normalizedSkill = skillMap[skill.toLowerCase()] || skill;
+                result.parameters.skill = normalizedSkill;
+            }
+
+            // Date normalization
+            if (result.parameters.date) {
+                let dateStr = String(result.parameters.date).toLowerCase().trim();
+                let parsedDate: Date | null = null;
+                if (dateStr === "next day" || dateStr === "tomorrow") {
+                    parsedDate = new Date();
+                    parsedDate.setDate(parsedDate.getDate() + 1);
+                } else if (dateStr === "today") {
+                    parsedDate = new Date();
+                } else if (dateStr === "day after tomorrow") {
+                    parsedDate = new Date();
+                    parsedDate.setDate(parsedDate.getDate() + 2);
+                } else {
+                    parsedDate = new Date(result.parameters.date);
+                }
+                if (!isNaN(parsedDate.getTime())) {
+                    const yyyy = parsedDate.getFullYear();
+                    const mm = String(parsedDate.getMonth() + 1).padStart(2, '0');
+                    const dd = String(parsedDate.getDate()).padStart(2, '0');
+                    result.parameters.date = `${yyyy}-${mm}-${dd}`;
+                } else {
+                    delete result.parameters.date;
+                }
+            }
+        }
+
+        // Ensure parameters is always an object
+        if (typeof result.parameters !== 'object' || result.parameters === null) {
+            result.parameters = {};
+        }
 
         return result;
     } catch (err) {
@@ -100,4 +181,12 @@ User query: "${query.trim()}"
         });
         return { intent: 'Unknown', parameters: {} };
     }
+}
+
+/**
+ * Clean AI response by removing <think>...</think> blocks
+ */
+function cleanAIResponse(aiResponse: string): string {
+    // Remove <think>...</think> blocks
+    return aiResponse.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
 }
