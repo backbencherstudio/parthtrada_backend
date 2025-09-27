@@ -51,3 +51,14 @@ export const reviewSchema = z.object({
   rating: z.number().max(5),
   description: z.string().optional(),
 })
+
+export const loginSchema = z.object({
+  email: z.string().email({ error: 'Invalid email address.' }).min(1, { error: 'Email is required.' }),
+  password: z.string().min(1, { error: 'Password is required.' }),
+})
+
+export const registerSchema = z.object({
+  name: z.string().min(1, { error: 'Name is required.' }),
+  email: z.string().email({ error: 'Invalid email address.' }).min(1, { error: 'Email is required.' }),
+  password: z.string({ error: 'Password is required.' }).min(8, { error: 'Password must be at least 8 character.' }),
+})

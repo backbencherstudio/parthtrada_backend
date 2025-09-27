@@ -2,13 +2,14 @@ import { Request, Response } from "express";
 import { PrismaClient, Role } from "@prisma/client";
 import jwt from "jsonwebtoken";
 import dotenv from "dotenv";
+import bcrypt from 'bcryptjs';
 import { AuthenticatedRequest } from "../../../middleware/verifyUsers";
 import fs from "fs";
 import path from "path";
 import { v4 as uuidv4 } from "uuid";
 import { getImageUrl } from "../../../utils/base_utl";
 import { generateOTP, sendVerificationOTP } from "../../../utils/emailService.utils";
-import { updateUserSchema } from "@/utils/validations";
+import { loginSchema, registerSchema, updateUserSchema } from "@/utils/validations";
 import stripe from "@/services/stripe";
 
 dotenv.config();
@@ -712,13 +713,18 @@ export const fordevSignup = async (req: Request, res: Response) => {
 // admin login
 export const adminLogin = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { email, password } = req.body;
 
-    // check if email and password are provided
-    if (!email || !password) {
-      res.status(400).json({ success: false, message: "Email and password are required" });
-      return;
+    const body = loginSchema.safeParse(req.body);
+    if (!body.success) {
+      res.status(400).json({
+        success: false,
+        message: "Invalid query parameters",
+        errors: body.error.flatten().fieldErrors,
+      });
+      return
     }
+
+    const { email, password } = body.data
 
     // check if email and password are correct
     const user = await prisma.users.findUnique({ where: { email } });
@@ -727,8 +733,7 @@ export const adminLogin = async (req: Request, res: Response): Promise<void> => 
       return;
     }
     // check if password is correct
-    // const isPasswordCorrect = await bcrypt.compare(password, user.password); 
-    const isPasswordCorrect = password === user.password;
+    const isPasswordCorrect = await bcrypt.compare(password, user.password);
 
     if (!isPasswordCorrect) {
       res.status(401).json({ success: false, message: "Invalid credentials" });
@@ -752,6 +757,46 @@ export const adminLogin = async (req: Request, res: Response): Promise<void> => 
     });
 
 
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error instanceof Error ? error.message : "Internal server error",
+    });
+  }
+}
+
+export const register = async (req: Request, res: Response) => {
+  try {
+    const body = registerSchema.safeParse(req.body);
+    if (!body.success) {
+      res.status(400).json({
+        success: false,
+        message: "Invalid query parameters",
+        errors: body.error.flatten().fieldErrors,
+      });
+      return
+    }
+
+    const { email, name, password } = body.data
+
+    const hashedPassword = bcrypt.hashSync(password, 12)
+
+    const payload = {
+      name,
+      email,
+      password: hashedPassword
+    }
+
+    await prisma.users.create({
+      data: {
+        linkedin_id: uuidv4(),
+        ...payload
+      }
+    })
+
+    res.status(201).json({
+      message: 'User created successfully.',
+    })
   } catch (error) {
     res.status(500).json({
       success: false,
