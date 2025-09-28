@@ -19,6 +19,14 @@ model Ucode {
   user         Users    @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
+model AdminProfile {
+  id         String  @id @default(cuid())
+  userId     String  @unique
+  first_name String?
+  last_name  String
+  user       Users   @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
 model StudentProfile {
   id                 String     @id @default(cuid())
   profession         String?
@@ -166,6 +174,7 @@ model Users {
   linkedin_id     String          @unique
   name            String?
   email           String?         @unique
+  phone           String?
   password        String?
   lastLogin       DateTime?
   image           String?
@@ -182,6 +191,7 @@ model Users {
   expertReviews   Review[]        @relation("ExpertReview")
   studentReviews  Review[]        @relation("StudentReview")
   studentProfile  StudentProfile?
+  adminProfile    AdminProfile?
   ucode           Ucode?
   transactions    Transaction[]   @relation("Transactions")
 }

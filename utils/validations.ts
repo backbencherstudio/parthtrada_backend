@@ -62,3 +62,17 @@ export const registerSchema = z.object({
   email: z.string().email({ error: 'Invalid email address.' }).min(1, { error: 'Email is required.' }),
   password: z.string({ error: 'Password is required.' }).min(8, { error: 'Password must be at least 8 character.' }),
 })
+
+
+export const verifyLoginSchema = z.object({
+  email: z.string().email({ error: 'Invalid email address.' }).min(1, { error: 'Email is required.' }),
+  otp: z.string().min(1, { error: 'OTP is required.' }),
+})
+
+
+export const adminProfileSchema = z.object({
+  first_name: z.string().optional(),
+  last_name: z.string().optional(),
+  phone: z.string().optional(),
+  email: z.string().email({ error: 'Invalid email address.' }).optional(),
+});

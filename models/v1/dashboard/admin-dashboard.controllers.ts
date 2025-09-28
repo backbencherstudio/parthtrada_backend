@@ -1,6 +1,8 @@
 import { Request, Response } from "express";
 import { PrismaClient } from "@prisma/client";
 import { dashboardExpertsQuerySchema, sessionsQuerySchema, transactionsQuerySchema, usersQuerySchema } from "@/utils/queryValidation";
+import { AuthenticatedRequest } from "@/middleware/verifyUsers";
+import { adminProfileSchema } from "@/utils/validations";
 
 const prisma = new PrismaClient();
 
@@ -524,3 +526,65 @@ export const dashboardRefundsList = async (req: Request, res: Response): Promise
     });
   }
 };
+
+export const updateProfile = async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const user_id = req.user?.id
+
+    const body = adminProfileSchema.safeParse(req.body);
+    if (!body.success) {
+      res.status(400).json({
+        success: false,
+        message: "Invalid query parameters",
+        errors: body.error.flatten().fieldErrors,
+      });
+      return
+    }
+
+    const { email, first_name, last_name, phone } = body.data
+
+    const profile = await prisma.users.update({
+      where: {
+        id: user_id
+      },
+      data: {
+        email,
+        phone
+      },
+      select: {
+        email: true,
+        phone: true
+      }
+    })
+
+    const admin_profile = await prisma.adminProfile.upsert({
+      where: {
+        userId: user_id
+      },
+      update: {
+        first_name: first_name,
+        last_name
+      },
+      create: {
+        userId: user_id,
+        first_name,
+        last_name,
+      }
+    })
+
+    res.status(200).json({
+      message: 'Profile updated successfully.',
+      data: {
+        first_name: admin_profile.first_name,
+        last_name: admin_profile.last_name,
+        phone: profile.phone,
+        email: profile.email,
+      }
+    })
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error instanceof Error ? error.message : "Internal server error",
+    });
+  }
+}

@@ -9,7 +9,7 @@ import path from "path";
 import { v4 as uuidv4 } from "uuid";
 import { getImageUrl } from "../../../utils/base_utl";
 import { generateOTP, sendVerificationOTP } from "../../../utils/emailService.utils";
-import { loginSchema, registerSchema, updateUserSchema } from "@/utils/validations";
+import { loginSchema, registerSchema, updateUserSchema, verifyLoginSchema } from "@/utils/validations";
 import stripe from "@/services/stripe";
 
 dotenv.config();
@@ -808,7 +808,18 @@ export const register = async (req: Request, res: Response) => {
 // verification otp for admin login
 export const verifyOTP = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { email, otp } = req.body;
+
+    const body = verifyLoginSchema.safeParse(req.body);
+    if (!body.success) {
+      res.status(400).json({
+        success: false,
+        message: "Invalid query parameters",
+        errors: body.error.flatten().fieldErrors,
+      });
+      return
+    }
+
+    const { email, otp } = body.data
 
     const userCode = await prisma.ucode.findFirst({ where: { email } });
     if (!userCode) {
