@@ -39,7 +39,7 @@ model StudentProfile {
 }
 
 model ExpertProfile {
-  id                 String     @id @default(cuid())
+  id                 String              @id @default(cuid())
   profession         String?
   organization       String?
   location           String?
@@ -49,11 +49,12 @@ model ExpertProfile {
   skills             String[]
   availableDays      String[]
   availableTime      String[]
-  stripeAccountId    String?    @unique
-  isOnboardCompleted Boolean    @default(false)
-  userId             String     @unique
-  chatRoomsAsExpert  ChatRoom[] @relation("ExpertProfileToChatRoom")
-  user               Users      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status             ExpertProfileStatus @default(ACTIVE)
+  stripeAccountId    String?             @unique
+  isOnboardCompleted Boolean             @default(false)
+  userId             String              @unique
+  chatRoomsAsExpert  ChatRoom[]          @relation("ExpertProfileToChatRoom")
+  user               Users               @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Booking {
@@ -241,4 +242,9 @@ enum NotificationType {
   PAYMENT_FAILED
   EXPERT_EARNED_MONEY
   SYSTEM_ALERT
+}
+
+enum ExpertProfileStatus {
+  ACTIVE
+  SUSPENDED
 }

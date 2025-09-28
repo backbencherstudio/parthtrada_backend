@@ -76,3 +76,7 @@ export const adminProfileSchema = z.object({
   phone: z.string().optional(),
   email: z.string().email({ error: 'Invalid email address.' }).optional(),
 });
+
+export const changeExpertStatus = z.object({
+  status: z.enum(['ACTIVE', 'SUSPENDED']),
+});

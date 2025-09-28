@@ -2,7 +2,7 @@ import { Request, Response } from "express";
 import { PrismaClient } from "@prisma/client";
 import { dashboardExpertsQuerySchema, sessionsQuerySchema, transactionsQuerySchema, usersQuerySchema } from "@/utils/queryValidation";
 import { AuthenticatedRequest } from "@/middleware/verifyUsers";
-import { adminProfileSchema } from "@/utils/validations";
+import { adminProfileSchema, changeExpertStatus } from "@/utils/validations";
 
 const prisma = new PrismaClient();
 
@@ -323,7 +323,7 @@ export const sessions = async (req: Request, res: Response): Promise<void> => {
       return
     }
 
-    const { page, perPage, search, status } = query.data;
+    const { expert_id, page, perPage, search, status } = query.data;
 
     const skip = (Number(page) - 1) * Number(perPage);
 
@@ -332,6 +332,9 @@ export const sessions = async (req: Request, res: Response): Promise<void> => {
     // Status filter
     if (status) {
       where.status = status
+    }
+    if (expert_id) {
+      where.expertId = expert_id
     }
     // Search filter (student or expert name)
     if (search) {
@@ -588,3 +591,146 @@ export const updateProfile = async (req: AuthenticatedRequest, res: Response) =>
     });
   }
 }
+
+export const expertById = async (req: Request, res: Response): Promise<any> => {
+  try {
+    const id = req.params?.id;
+    if (!id) {
+      return res.status(400).json({ success: false, message: "Please provide expert ID." });
+    }
+
+    const expert = await prisma.expertProfile.findUnique({
+      where: { userId: id },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            image: true,
+            studentProfile: true,
+            createdAt: true
+          },
+        },
+      },
+    });
+
+    if (!expert) {
+      return res.status(404).json({ success: false, message: "Expert not found." });
+    }
+
+    const grouped = await prisma.review.groupBy({
+      by: ["rating"],
+      where: { expertId: expert.userId },
+      _count: { rating: true },
+    });
+
+    const totalReviews = grouped.reduce((sum, g) => sum + g._count.rating, 0);
+    const ratingCounts: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+    for (const g of grouped) ratingCounts[g.rating] = g._count.rating;
+
+    const averageRating =
+      totalReviews > 0
+        ? (
+          Object.entries(ratingCounts).reduce(
+            (sum, [rating, count]) => sum + Number(rating) * count,
+            0
+          ) / totalReviews
+        ).toFixed(2)
+        : null;
+
+    const studentCount = await prisma.booking.groupBy({
+      by: ['studentId'],
+      where: {
+        expertId: expert.userId,
+        studentId: { not: null },
+      },
+      _count: {
+        studentId: true,
+      },
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Expert fetched successfully.",
+      data: {
+        expert: {
+          id: expert.id,
+          name: expert.user.name,
+          metadata: {
+            status: expert.status,
+            description: expert.description,
+            ratings: {
+              total: totalReviews,
+              avg: averageRating
+            },
+            location: expert.location,
+            skills: expert.skills,
+            experience: expert.experience,
+            session_fee: expert.hourlyRate,
+            total_reviews: totalReviews,
+            join_date: expert.user.createdAt
+          },
+          stats: {
+            sessions: 0,
+            students: studentCount.length,
+            transactions: 0,
+            cancelled: 0
+          },
+        },
+      },
+    });
+  } catch (error) {
+    console.error("Dashboard experts list error", error);
+    res.status(500).json({
+      success: false,
+      message: error instanceof Error ? error.message : "Internal server error",
+    });
+  }
+};
+
+export const changeStatus = async (req: Request, res: Response): Promise<any> => {
+  try {
+    const id = req.params?.id;
+    if (!id) {
+      return res.status(400).json({ success: false, message: "Please provide expert ID." });
+    }
+
+    const body = changeExpertStatus.safeParse(req.body);
+    if (!body.success) {
+      res.status(400).json({
+        success: false,
+        message: "Invalid query parameters",
+        errors: body.error.flatten().fieldErrors,
+      });
+      return
+    }
+
+    const { status } = body.data
+
+    const expert = await prisma.expertProfile.update({
+      where: { userId: id },
+      data: {
+        status
+      }
+    });
+
+    if (!expert) {
+      return res.status(404).json({ success: false, message: "Expert not found." });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Expert status changed successfully.",
+      data: {
+        expert: expert,
+      },
+    });
+  } catch (error) {
+    console.error("Getting error from change status", error?.message);
+    res.status(500).json({
+      success: false,
+      message: error instanceof Error ? error.message : "Internal server error",
+    });
+  }
+};

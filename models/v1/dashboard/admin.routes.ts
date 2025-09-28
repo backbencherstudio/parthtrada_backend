@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { dashboard, experts, sessions, transactions, updateProfile, users } from "./admin-dashboard.controllers";
+import { changeStatus, dashboard, expertById, experts, sessions, transactions, updateProfile, users } from "./admin-dashboard.controllers";
 import { requireRole } from "@/middleware/requireRole";
 
 const router = Router();
@@ -12,5 +12,7 @@ router.get("/experts", experts);
 router.get("/sessions", sessions);
 router.get("/transactions", transactions);
 router.patch("/profile/update", updateProfile);
+router.get("/experts/:id", expertById);
+router.patch("/experts/:id/status", changeStatus);
 
 export default router;

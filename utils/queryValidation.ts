@@ -83,11 +83,14 @@ export const dashboardExpertsQuerySchema = z.object({
         .nullable()
         .optional(),
     sortBy: z
-        .string()
+        .enum(['rating', 'totalStudent'])
         .optional(),
 })
 
 export const sessionsQuerySchema = z.object({
+    expert_id: z
+        .string()
+        .optional(),
     page: z
         .string()
         .default('1')
