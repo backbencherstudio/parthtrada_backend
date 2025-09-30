@@ -1,19 +1,18 @@
 import { Request, Response } from "express";
-import { PrismaClient, TransactionStatus } from "@prisma/client";
+import { PrismaClient } from "@prisma/client";
+import { dashboardExpertsQuerySchema, sessionsQuerySchema, transactionsQuerySchema, usersQuerySchema } from "@/utils/queryValidation";
+import { AuthenticatedRequest } from "@/middleware/verifyUsers";
+import { adminProfileSchema, changeExpertStatus } from "@/utils/validations";
 
 const prisma = new PrismaClient();
 
 export const dashboard = async (req: Request, res: Response): Promise<void> => {
   try {
-    const [totalUsers, studentCount, expertCount, totalSessions, txAgg] = await Promise.all([
-      prisma.user.count(),
-      prisma.user.count({ where: { activeProfile: "STUDENT" } }),
-      prisma.user.count({ where: { activeProfile: "EXPERT" } }),
+    const [totalUsers, studentCount, expertCount, totalSessions,] = await Promise.all([
+      prisma.users.count(),
+      prisma.users.count({ where: { activeProfile: "STUDENT" } }),
+      prisma.users.count({ where: { activeProfile: "EXPERT" } }),
       prisma.booking.count(),
-      prisma.transaction.aggregate({
-        where: { status: TransactionStatus.SUCCESS },
-        _sum: { amount: true },
-      }),
     ]);
 
     // percentage calculation
@@ -39,7 +38,7 @@ export const dashboard = async (req: Request, res: Response): Promise<void> => {
     });
 
     // Get latest 4 users
-    const latestUsers = await prisma.user.findMany({
+    const latestUsers = await prisma.users.findMany({
       orderBy: { createdAt: 'desc' },
       take: 4,
       select: {
@@ -51,7 +50,7 @@ export const dashboard = async (req: Request, res: Response): Promise<void> => {
     });
 
     // Get latest 4 experts with details
-    const latestExpertsRaw = await prisma.user.findMany({
+    const latestExpertsRaw = await prisma.users.findMany({
       where: { activeProfile: "EXPERT" },
       orderBy: { createdAt: 'desc' },
       take: 4,
@@ -121,7 +120,7 @@ export const dashboard = async (req: Request, res: Response): Promise<void> => {
           totalUsers,
           totalExperts: expertCount,
           totalSessions,
-          totalTransactions: txAgg._sum.amount ?? 0,
+          // totalTransactions: txAgg._sum.amount ?? 0,
         },
         userRole: {
           students: { count: studentCount, percent: studentPercent },
@@ -145,11 +144,20 @@ export const dashboard = async (req: Request, res: Response): Promise<void> => {
   }
 };
 
-
-export const dashboardUsersList = async (req: Request, res: Response): Promise<void> => {
+export const users = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { page = 1, limit = 10, search = '', role } = req.query;
-    const skip = (Number(page) - 1) * Number(limit);
+    const query = usersQuerySchema.safeParse(req.query);
+    if (!query.success) {
+      res.status(400).json({
+        success: false,
+        message: "Invalid pagination parameters",
+        errors: query.error.flatten().fieldErrors,
+      });
+      return
+    }
+
+    const { page, perPage, role, search } = query.data;
+    const skip = (page - 1) * perPage;
 
     // Build where clause
     let where: any = {};
@@ -159,15 +167,15 @@ export const dashboardUsersList = async (req: Request, res: Response): Promise<v
         { email: { contains: search, mode: 'insensitive' } },
       ];
     }
-    if (role && (role === 'STUDENT' || role === 'EXPERT')) {
+    if (role) {
       where.activeProfile = role;
     }
 
-    const [totalUsers, users] = await Promise.all([
-      prisma.user.count({ where }),
-      prisma.user.findMany({
+    const [total, users] = await Promise.all([
+      prisma.users.count({ where }),
+      prisma.users.findMany({
         skip,
-        take: Number(limit),
+        take: Number(perPage),
         orderBy: { createdAt: 'desc' },
         where,
         select: {
@@ -183,8 +191,15 @@ export const dashboardUsersList = async (req: Request, res: Response): Promise<v
     res.json({
       success: true,
       data: {
-        totalUsers,
         users,
+        pagination: {
+          total,
+          page,
+          perPage,
+          totalPages: Math.ceil(total / perPage),
+          hasNextPage: page * perPage < total,
+          hasPrevPage: page > 1,
+        },
       },
     });
   } catch (error) {
@@ -196,10 +211,22 @@ export const dashboardUsersList = async (req: Request, res: Response): Promise<v
   }
 };
 
-export const dashboardExpertsList = async (req: Request, res: Response): Promise<void> => {
+export const experts = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { page = 1, limit = 10, search = '', status, sortBy } = req.query;
-    const skip = (Number(page) - 1) * Number(limit);
+
+    const query = dashboardExpertsQuerySchema.safeParse(req.query);
+
+    if (!query.success) {
+      res.status(400).json({
+        success: false,
+        message: "Invalid pagination parameters",
+        errors: query.error.flatten().fieldErrors,
+      });
+      return
+    }
+
+    const { page, perPage, search, sortBy, status } = query.data;
+    const skip = (page - 1) * perPage;
 
     // Build where clause
     let where: any = { activeProfile: 'EXPERT' };
@@ -210,27 +237,18 @@ export const dashboardExpertsList = async (req: Request, res: Response): Promise
       ];
     }
 
-    // Map status filter to BookingStatus
-    let bookingStatus: any = undefined;
     if (status) {
-      if (status === 'upcoming') bookingStatus = 'UPCOMING';
-      else if (status === 'missed') bookingStatus = 'MISSED';
-      else if (status === 'complete') bookingStatus = 'COMPLETED';
-    }
-
-    // If status filter is present, filter experts who have at least one booking with that status
-    if (bookingStatus) {
       where.expertBookings = {
-        some: { status: bookingStatus }
+        some: { status: status }
       };
     }
 
-    const [totalExperts, expertsRaw] = await Promise.all([
-      prisma.user.count({ where }),
-      prisma.user.findMany({
+    const [total, expertsRaw] = await Promise.all([
+      prisma.users.count({ where }),
+      prisma.users.findMany({
         skip,
-        take: Number(limit),
-        orderBy: { createdAt: 'desc' }, // fallback order
+        take: Number(perPage),
+        orderBy: { createdAt: 'desc' },
         where,
         select: {
           id: true,
@@ -271,8 +289,15 @@ export const dashboardExpertsList = async (req: Request, res: Response): Promise
     res.json({
       success: true,
       data: {
-        totalExperts,
         experts,
+        pagination: {
+          total,
+          page,
+          perPage,
+          totalPages: Math.ceil(total / perPage),
+          hasNextPage: page * perPage < total,
+          hasPrevPage: page > 1,
+        },
       },
     });
   } catch (error) {
@@ -284,19 +309,32 @@ export const dashboardExpertsList = async (req: Request, res: Response): Promise
   }
 };
 
-
-export const dashboardSessionsList = async (req: Request, res: Response): Promise<void> => {
+export const sessions = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { page = 1, limit = 10, search = '', status } = req.query;
-    const skip = (Number(page) - 1) * Number(limit);
+
+    const query = sessionsQuerySchema.safeParse(req.query);
+
+    if (!query.success) {
+      res.status(400).json({
+        success: false,
+        message: "Invalid pagination parameters",
+        errors: query.error.flatten().fieldErrors,
+      });
+      return
+    }
+
+    const { expert_id, page, perPage, search, status } = query.data;
+
+    const skip = (Number(page) - 1) * Number(perPage);
 
     // Build where clause
     let where: any = {};
     // Status filter
     if (status) {
-      if (status === 'upcoming') where.status = 'UPCOMING';
-      else if (status === 'missed') where.status = 'MISSED';
-      else if (status === 'completed') where.status = 'COMPLETED';
+      where.status = status
+    }
+    if (expert_id) {
+      where.expertId = expert_id
     }
     // Search filter (student or expert name)
     if (search) {
@@ -306,11 +344,11 @@ export const dashboardSessionsList = async (req: Request, res: Response): Promis
       ];
     }
 
-    const [totalSessions, sessions] = await Promise.all([
+    const [total, sessions] = await Promise.all([
       prisma.booking.count({ where }),
       prisma.booking.findMany({
         skip,
-        take: Number(limit),
+        take: Number(perPage),
         orderBy: { date: 'desc' },
         where,
         include: {
@@ -324,8 +362,15 @@ export const dashboardSessionsList = async (req: Request, res: Response): Promis
     res.json({
       success: true,
       data: {
-        totalSessions,
         sessions,
+        pagination: {
+          total,
+          page,
+          perPage,
+          totalPages: Math.ceil(total / perPage),
+          hasNextPage: page * perPage < total,
+          hasPrevPage: page > 1,
+        },
       },
     });
   } catch (error) {
@@ -337,23 +382,25 @@ export const dashboardSessionsList = async (req: Request, res: Response): Promis
   }
 };
 
-export const dashboardTransactionsList = async (req: Request, res: Response): Promise<void> => {
+export const transactions = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { page = 1, limit = 10, status, search = '' } = req.query;
-    const skip = (Number(page) - 1) * Number(limit);
+    const query = transactionsQuerySchema.safeParse(req.query);
 
-    // Map status filter to BookingStatus
-    let bookingStatusFilter: any = undefined;
-    if (status) {
-      if (status === 'pending') bookingStatusFilter = 'UPCOMING';
-      else if (status === 'complete') bookingStatusFilter = 'COMPLETED';
-      else if (status === 'refund') bookingStatusFilter = 'REFUNDED';
+    if (!query.success) {
+      res.status(400).json({
+        success: false,
+        message: "Invalid pagination parameters",
+        errors: query.error.flatten().fieldErrors,
+      });
+      return
     }
 
-    // Build where clause for transaction
+    const { page, perPage, search, status } = query.data;
+    const skip = (Number(page) - 1) * Number(perPage);
+
     let where: any = {};
-    if (bookingStatusFilter) {
-      where.booking = { status: bookingStatusFilter };
+    if (status) {
+      where.booking = { status: status };
     }
     if (search) {
       where.AND = where.AND || [];
@@ -365,11 +412,11 @@ export const dashboardTransactionsList = async (req: Request, res: Response): Pr
       });
     }
 
-    const [totalTransactions, transactions] = await Promise.all([
+    const [total, transactions] = await Promise.all([
       prisma.transaction.count({ where }),
       prisma.transaction.findMany({
         skip,
-        take: Number(limit),
+        take: Number(perPage),
         orderBy: { createdAt: 'desc' },
         where,
         include: {
@@ -397,8 +444,15 @@ export const dashboardTransactionsList = async (req: Request, res: Response): Pr
     res.json({
       success: true,
       data: {
-        totalTransactions,
         transactions: formattedTransactions,
+        pagination: {
+          total,
+          page,
+          perPage,
+          totalPages: Math.ceil(total / perPage),
+          hasNextPage: page * perPage < total,
+          hasPrevPage: page > 1,
+        },
       },
     });
   } catch (error) {
@@ -476,4 +530,207 @@ export const dashboardRefundsList = async (req: Request, res: Response): Promise
   }
 };
 
+export const updateProfile = async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const user_id = req.user?.id
 
+    const body = adminProfileSchema.safeParse(req.body);
+    if (!body.success) {
+      res.status(400).json({
+        success: false,
+        message: "Invalid query parameters",
+        errors: body.error.flatten().fieldErrors,
+      });
+      return
+    }
+
+    const { email, first_name, last_name, phone } = body.data
+
+    const profile = await prisma.users.update({
+      where: {
+        id: user_id
+      },
+      data: {
+        email,
+        phone
+      },
+      select: {
+        email: true,
+        phone: true
+      }
+    })
+
+    const admin_profile = await prisma.adminProfile.upsert({
+      where: {
+        userId: user_id
+      },
+      update: {
+        first_name: first_name,
+        last_name
+      },
+      create: {
+        userId: user_id,
+        first_name,
+        last_name,
+      }
+    })
+
+    res.status(200).json({
+      message: 'Profile updated successfully.',
+      data: {
+        first_name: admin_profile.first_name,
+        last_name: admin_profile.last_name,
+        phone: profile.phone,
+        email: profile.email,
+      }
+    })
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error instanceof Error ? error.message : "Internal server error",
+    });
+  }
+}
+
+export const expertById = async (req: Request, res: Response): Promise<any> => {
+  try {
+    const id = req.params?.id;
+    if (!id) {
+      return res.status(400).json({ success: false, message: "Please provide expert ID." });
+    }
+
+    const expert = await prisma.expertProfile.findUnique({
+      where: { userId: id },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            image: true,
+            studentProfile: true,
+            createdAt: true
+          },
+        },
+      },
+    });
+
+    if (!expert) {
+      return res.status(404).json({ success: false, message: "Expert not found." });
+    }
+
+    const grouped = await prisma.review.groupBy({
+      by: ["rating"],
+      where: { expertId: expert.userId },
+      _count: { rating: true },
+    });
+
+    const totalReviews = grouped.reduce((sum, g) => sum + g._count.rating, 0);
+    const ratingCounts: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+    for (const g of grouped) ratingCounts[g.rating] = g._count.rating;
+
+    const averageRating =
+      totalReviews > 0
+        ? (
+          Object.entries(ratingCounts).reduce(
+            (sum, [rating, count]) => sum + Number(rating) * count,
+            0
+          ) / totalReviews
+        ).toFixed(2)
+        : null;
+
+    const studentCount = await prisma.booking.groupBy({
+      by: ['studentId'],
+      where: {
+        expertId: expert.userId,
+        studentId: { not: null },
+      },
+      _count: {
+        studentId: true,
+      },
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Expert fetched successfully.",
+      data: {
+        expert: {
+          id: expert.id,
+          name: expert.user.name,
+          metadata: {
+            status: expert.status,
+            description: expert.description,
+            ratings: {
+              total: totalReviews,
+              avg: averageRating
+            },
+            location: expert.location,
+            skills: expert.skills,
+            experience: expert.experience,
+            session_fee: expert.hourlyRate,
+            total_reviews: totalReviews,
+            join_date: expert.user.createdAt
+          },
+          stats: {
+            sessions: 0,
+            students: studentCount.length,
+            transactions: 0,
+            cancelled: 0
+          },
+        },
+      },
+    });
+  } catch (error) {
+    console.error("Dashboard experts list error", error);
+    res.status(500).json({
+      success: false,
+      message: error instanceof Error ? error.message : "Internal server error",
+    });
+  }
+};
+
+export const changeStatus = async (req: Request, res: Response): Promise<any> => {
+  try {
+    const id = req.params?.id;
+    if (!id) {
+      return res.status(400).json({ success: false, message: "Please provide expert ID." });
+    }
+
+    const body = changeExpertStatus.safeParse(req.body);
+    if (!body.success) {
+      res.status(400).json({
+        success: false,
+        message: "Invalid query parameters",
+        errors: body.error.flatten().fieldErrors,
+      });
+      return
+    }
+
+    const { status } = body.data
+
+    const expert = await prisma.expertProfile.update({
+      where: { userId: id },
+      data: {
+        status
+      }
+    });
+
+    if (!expert) {
+      return res.status(404).json({ success: false, message: "Expert not found." });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Expert status changed successfully.",
+      data: {
+        expert: expert,
+      },
+    });
+  } catch (error) {
+    console.error("Getting error from change status", error?.message);
+    res.status(500).json({
+      success: false,
+      message: error instanceof Error ? error.message : "Internal server error",
+    });
+  }
+};

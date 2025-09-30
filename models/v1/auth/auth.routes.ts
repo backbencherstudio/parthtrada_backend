@@ -1,25 +1,23 @@
 import { Router } from 'express';
-import { linkedinCallback, updateUser, beExpart, beStudent, fordev, fordevSignup, adminLogin, verifyOTP, resendOTP } from './auth.controllers';
-import { verifyUser } from '../../../middleware/verifyUsers';
-import upload from "../../../config/multer.config";
-import { verifyAdmin } from '../../../middleware/verifyAdmin';
+import { linkedinCallback, updateUser, beExpert, beStudent, fordev, fordevSignup, adminLogin, verifyOTP, resendOTP, register } from './auth.controllers';
+import { verifyUser } from '@/middleware/verifyUsers';
+import upload from '@/config/multer.config';
 
 const router = Router();
 
-
 router.get('/linkedin/callback', linkedinCallback);
 
-router.post('/fotdev-login', fordev)
-router.post('/fordev-signup', fordevSignup); 
+router.post('/for-dev-login', fordev)
+router.post('/for-dev-signup', fordevSignup);
 
-router.put('/update', verifyUser('ANY'), upload.single("image"),  updateUser);
+router.put('/update', verifyUser('ANY'), upload.single("image"), updateUser);
 
-router.put('/be-expart', verifyUser('STUDENT'), beExpart)
+router.put('/be-expert', verifyUser('STUDENT'), beExpert)
 router.put('/be-student', verifyUser('EXPERT'), beStudent);
 
-router.post('/admin-login', verifyAdmin, adminLogin);
-router.post('/admin-login-otp', verifyAdmin, verifyOTP);
-router.post('/admin-login-otp-resend', verifyAdmin, resendOTP);
-
+router.post('/login', adminLogin);
+router.post('/register', register);
+router.post('/verify-login', verifyOTP);
+router.post('/admin-login-otp-resend', resendOTP);
 
 export default router;

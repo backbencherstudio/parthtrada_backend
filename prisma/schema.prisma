@@ -1,9 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -13,83 +7,54 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model User {
-  id         String @id @default(cuid())
-  linkedInId String @unique
-
-  name          String?
-  email         String?   @unique //for admin
-  password      String? //for admin
-  lastLogin     DateTime?
-  image         String?
-  activeProfile Role      @default(STUDENT)
-  timeZone      String?
-
-  studentProfile StudentProfile?
-  expertProfile  ExpertProfile?
-  ucode          Ucode[]
-
-  studentBookings Booking[] @relation("StudentBookings")
-  expertBookings  Booking[] @relation("ExpertBookings")
-
-  studentReviews Review[]       @relation("StudentReview")
-  expertReviews  Review[]       @relation("ExpertReview")
-  notifications  Notification[]
-  transactions   Transaction[] @relation("Transactions")
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+model Ucode {
+  id           String   @id @default(cuid())
+  accessToken  String?
+  refreshToken String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  otp          String?
+  email        String?
+  userId       String   @unique
+  user         Users    @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
-model Ucode {
-  id           String  @id @default(cuid())
-  accessToken  String? //Linkedin access token
-  refreshToken String? //Linkedin refresh token
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  otp String?
-  email String?
-
-  userId String @unique
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+model AdminProfile {
+  id         String  @id @default(cuid())
+  userId     String  @unique
+  first_name String?
+  last_name  String
+  user       Users   @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model StudentProfile {
-  id String @id @default(cuid())
-
+  id           String  @id @default(cuid())
   profession   String?
   organization String?
   location     String?
   description  String?
-
-  userId String @unique
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  chatRoomsAsStudent ChatRoom[] @relation("StudentProfileToChatRoom")
+  userId       String  @unique
+  // chatRoomsAsStudent ChatRoom[] @relation("StudentProfileToChatRoom")
+  user         Users   @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model ExpertProfile {
-  id String @id @default(cuid())
-
-  profession    String?
-  organization  String?
-  location      String?
-  description   String?
-  experience    String?
-  hourlyRate    String?
-  skills        String[]
-  availableDays String[]
-  availableTime String[]
-
-  stripeAccountId    String?
-  isOnboardCompleted Boolean @default(false)
-
-  userId String @unique
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  chatRoomsAsExpert ChatRoom[] @relation("ExpertProfileToChatRoom")
+  id                 String              @id @default(cuid())
+  profession         String?
+  organization       String?
+  location           String?
+  description        String?
+  experience         String?
+  hourlyRate         Int?
+  skills             String[]
+  availableDays      String[]
+  availableTime      String[]
+  status             ExpertProfileStatus @default(ACTIVE)
+  stripeAccountId    String?             @unique
+  isOnboardCompleted Boolean             @default(false)
+  userId             String              @unique
+  // chatRoomsAsExpert  ChatRoom[]          @relation("ExpertProfileToChatRoom")
+  user               Users               @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Booking {
@@ -97,92 +62,64 @@ model Booking {
   studentId       String?
   expertId        String?
   date            DateTime
-  
   expertDateTime  DateTime
   studentDateTime DateTime
-
   meetingLink     String?
   sessionDetails  Json
   sessionDuration Int
   status          BookingStatus @default(PENDING)
-
-  answer1 String?
-  answer2 String?
-  answer3 String?
-
-  student     User?        @relation("StudentBookings", fields: [studentId], references: [id], onDelete: SetNull)
-  expert      User?        @relation("ExpertBookings", fields: [expertId], references: [id], onDelete: SetNull)
-  transaction Transaction?
-
-  review Review?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  answer1         String?
+  answer2         String?
+  answer3         String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  expert          Users?        @relation("ExpertBookings", fields: [expertId], references: [id])
+  student         Users?        @relation("StudentBookings", fields: [studentId], references: [id])
+  review          Review?
+  transaction     Transaction?
 }
 
 model Transaction {
-  id               String      @id @default(cuid())
-  createdAt        DateTime    @default(now())      @map("created_at")
-  updatedAt        DateTime    @updatedAt           @map("updated_at")
-  deletedAt        DateTime?   @map("deleted_at")
-  
-
-  // Relations
-  bookingId        String?     @unique
-  booking          Booking?    @relation(fields: [bookingId], references: [id], onDelete: SetNull)
-
-  storeId          String?     @map("store_id")
-  userId           String?     @map("user_id")
-  user             User?       @relation("Transactions", fields: [userId], references: [id])
-
-  orderId          String?     @map("order_id")
-  type             String?     @default("order")
-  withdrawVia      WithdrawalMethod? @default(WALLET) @map("withdraw_via")
-
-  // Payment details
-  provider         String?
-  providerId       String?
-  referenceNumber  String?     @map("reference_number")
-  rawStatus        String?     @map("raw_status")
-  status           PaymentStatus? @default(PENDING)
-
-  // Amount & currency
-  amount           Decimal?
-  currency         String?
-  paidAmount       Decimal?    @map("paid_amount")
-  paidCurrency     String?     @map("paid_currency")
-
-  // Refund info
-  refundDate       DateTime?
-  refundReason     String?
+  id              String            @id @default(cuid())
+  createdAt       DateTime          @default(now()) @map("created_at")
+  updatedAt       DateTime          @updatedAt @map("updated_at")
+  deletedAt       DateTime?         @map("deleted_at")
+  bookingId       String?           @unique
+  storeId         String?           @map("store_id")
+  userId          String?           @map("user_id")
+  orderId         String?           @map("order_id")
+  type            String?           @default("order")
+  withdrawVia     WithdrawalMethod? @default(WALLET) @map("withdraw_via")
+  provider        String?
+  providerId      String?
+  referenceNumber String?           @map("reference_number")
+  rawStatus       String?           @map("raw_status")
+  status          PaymentStatus?    @default(PENDING)
+  amount          Float?
+  currency        String?
+  paidAmount      Decimal?          @map("paid_amount")
+  paidCurrency    String?           @map("paid_currency")
+  refundDate      DateTime?
+  refundReason    String?
+  booking         Booking?          @relation(fields: [bookingId], references: [id])
+  user            Users?            @relation("Transactions", fields: [userId], references: [id])
 
   @@map("transactions")
 }
 
-
 model Review {
-  id          String  @id @default(cuid())
+  id          String   @id @default(cuid())
   rating      Int
   description String?
-
-  bookingId String?  @unique
-  booking   Booking? @relation(fields: [bookingId], references: [id], onDelete: SetNull)
-
-  studentId String
-  expertId  String
-
-  student User @relation("StudentReview", fields: [studentId], references: [id])
-  expert  User @relation("ExpertReview", fields: [expertId], references: [id])
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  bookingId   String?  @unique
+  studentId   String
+  expertId    String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  booking     Booking? @relation(fields: [bookingId], references: [id])
+  expert      Users    @relation("ExpertReview", fields: [expertId], references: [id])
+  student     Users    @relation("StudentReview", fields: [studentId], references: [id])
 }
-
-// | Field       | মানে                        |
-// | ----------- | -------------------------- |
-// | `studentId` | কে review দিল              |
-// | `expertId`  | কাকে review দিল            |
-// | `bookingId` | কোন session-এর জন্য review |
 
 model Notification {
   id          String           @id @default(cuid())
@@ -192,40 +129,76 @@ model Notification {
   isRead      Boolean          @default(false)
   image       String?
   recipientId String
-  recipient   User             @relation(fields: [recipientId], references: [id], onDelete: Cascade)
-
-  createdAt DateTime @default(now())
+  createdAt   DateTime         @default(now())
+  recipient   Users            @relation(fields: [recipientId], references: [id], onDelete: Cascade)
 }
 
-model ChatRoom {
-  id String @id @default(cuid())
+// model ChatRoom {
+//   id        String          @id @default(cuid())
+//   studentId String?
+//   expertId  String?
+//   createdAt DateTime        @default(now())
+//   updatedAt DateTime        @updatedAt
+//   expert    ExpertProfile?  @relation("ExpertProfileToChatRoom", fields: [expertId], references: [id])
+//   student   StudentProfile? @relation("StudentProfileToChatRoom", fields: [studentId], references: [id])
+//   messages  Message[]
 
-  studentId String?
-  expertId  String?
+//   @@unique([studentId, expertId])
+// }
 
-  student StudentProfile? @relation("StudentProfileToChatRoom", fields: [studentId], references: [id], onDelete: SetNull)
-  expert  ExpertProfile?  @relation("ExpertProfileToChatRoom", fields: [expertId], references: [id], onDelete: SetNull)
+// model Message {
+//   id         String   @id @default(cuid())
+//   content    String
+//   senderType Role
+//   senderId   String
+//   chatRoomId String
+//   isRead     Boolean  @default(false)
+//   isAI       Boolean  @default(false)
+//   createdAt  DateTime @default(now())
+//   chatRoom   ChatRoom @relation(fields: [chatRoomId], references: [id], onDelete: Cascade)
+// }
 
-  messages Message[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@unique([studentId, expertId])
+model PaymentMethod {
+  id        String  @id @default(cuid())
+  provider  String
+  method_id String  @unique
+  brand     String?
+  last4     String?
+  expMonth  Int?
+  expYear   Int?
+  userId    String
+  user      Users   @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
-model Message {
-  id      String @id @default(cuid())
-  content String
-
-  senderType Role
-  senderId   String
-  chatRoomId String
-  isRead     Boolean @default(false)
-
-  chatRoom ChatRoom @relation(fields: [chatRoomId], references: [id], onDelete: Cascade)
-
-  createdAt DateTime @default(now())
+model Users {
+  id                    String          @id @default(cuid())
+  linkedin_id           String          @unique
+  name                  String?
+  email                 String?         @unique
+  phone                 String?
+  password              String?
+  lastLogin             DateTime?
+  image                 String?
+  activeProfile         Role            @default(STUDENT)
+  timezone              String?
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
+  expertBookings        Booking[]       @relation("ExpertBookings")
+  studentBookings       Booking[]       @relation("StudentBookings")
+  expertProfile         ExpertProfile?
+  notifications         Notification[]
+  customer_id           String?
+  payment_methods       PaymentMethod[]
+  expertReviews         Review[]        @relation("ExpertReview")
+  studentReviews        Review[]        @relation("StudentReview")
+  studentProfile        StudentProfile?
+  adminProfile          AdminProfile?
+  ucode                 Ucode?
+  transactions          Transaction[]   @relation("Transactions")
+  sentConversations     Conversation[]  @relation("SentConversations")
+  receivedConversations Conversation[]  @relation("ReceivedConversations")
+  sentMessages          Message[]       @relation("SentMessages")
+  receivedMessages      Message[]       @relation("ReceivedMessages")
 }
 
 enum BookingStatus {
@@ -241,7 +214,6 @@ enum PaymentProvider {
   PAYPAL
 }
 
-
 enum PaymentStatus {
   PENDING
   COMPLETED
@@ -254,6 +226,36 @@ enum WithdrawalMethod {
   WALLET
   BANK
   STRIPE
+}
+
+model Conversation {
+  id            String    @id @default(cuid())
+  senderId      String
+  recipientId   String
+  senderRole    Role
+  recipientRole Role
+  sender        Users     @relation("SentConversations", fields: [senderId], references: [id])
+  recipient     Users     @relation("ReceivedConversations", fields: [recipientId], references: [id])
+  messages      Message[]
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@unique([senderId, recipientId, senderRole, recipientRole])
+}
+
+model Message {
+  id             String       @id @default(cuid())
+  conversationId String
+  senderId       String
+  recipientId    String
+  senderRole     Role
+  recipientRole  Role
+  content        String
+  read_message   Boolean      @default(false)
+  conversation   Conversation @relation(fields: [conversationId], references: [id])
+  sender         Users        @relation("SentMessages", fields: [senderId], references: [id])
+  recipient      Users        @relation("ReceivedMessages", fields: [recipientId], references: [id])
+  createdAt      DateTime     @default(now())
 }
 
 enum Role {
@@ -274,4 +276,9 @@ enum NotificationType {
   PAYMENT_FAILED
   EXPERT_EARNED_MONEY
   SYSTEM_ALERT
+}
+
+enum ExpertProfileStatus {
+  ACTIVE
+  SUSPENDED
 }

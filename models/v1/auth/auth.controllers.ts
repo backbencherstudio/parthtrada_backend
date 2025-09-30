@@ -2,13 +2,15 @@ import { Request, Response } from "express";
 import { PrismaClient, Role } from "@prisma/client";
 import jwt from "jsonwebtoken";
 import dotenv from "dotenv";
+import bcrypt from 'bcryptjs';
 import { AuthenticatedRequest } from "../../../middleware/verifyUsers";
 import fs from "fs";
 import path from "path";
 import { v4 as uuidv4 } from "uuid";
-import bcrypt from "bcryptjs";
-import { baseUrl, getImageUrl } from "../../../utils/base_utl";
+import { getImageUrl } from "../../../utils/base_utl";
 import { generateOTP, sendVerificationOTP } from "../../../utils/emailService.utils";
+import { loginSchema, registerSchema, updateUserSchema, verifyLoginSchema } from "@/utils/validations";
+import stripe from "@/services/stripe";
 
 dotenv.config();
 
@@ -27,7 +29,7 @@ const fetchAccessToken = async (code: string) => {
     code,
     client_id: LINKEDIN_CONFIG.clientId,
     client_secret: LINKEDIN_CONFIG.clientSecret,
-    redirect_uri: LINKEDIN_CONFIG.redirectUri,                
+    redirect_uri: LINKEDIN_CONFIG.redirectUri,
   });
 
   const response = await fetch(LINKEDIN_CONFIG.tokenEndpoint, {
@@ -94,13 +96,13 @@ export const linkedinCallback = async (req: Request, res: Response) => {
 
     const tokenData = await fetchAccessToken(code);
     const userInfo = await fetchUserInfo(tokenData.access_token);
-    console.log("userInfo",userInfo);
+    console.log("userInfo", userInfo);
 
     // Download and save the profile picture
 
-    let user = await prisma.user.findFirst({
+    let user = await prisma.users.findFirst({
       where: {
-        linkedInId: userInfo.sub,
+        linkedin_id: userInfo.sub,
       },
       include: {
         studentProfile: true,
@@ -112,9 +114,9 @@ export const linkedinCallback = async (req: Request, res: Response) => {
     if (!user) {
       const savedImagePath = await downloadAndSaveImage(userInfo.picture);
 
-      user = await prisma.user.create({
+      user = await prisma.users.create({
         data: {
-          linkedInId: userInfo.sub,
+          linkedin_id: userInfo.sub,
           name: userInfo.name,
           email: userInfo.email,
           image: savedImagePath || userInfo.picture,
@@ -125,6 +127,24 @@ export const linkedinCallback = async (req: Request, res: Response) => {
           expertProfile: true,
         },
       });
+
+      const customer = await stripe.customers.create({
+        name: userInfo.name,
+        email: userInfo.email,
+        metadata: {
+          user_id: user.id,
+        },
+        description: 'New Customer',
+      })
+
+      await prisma.users.update({
+        where: {
+          id: user.id
+        },
+        data: {
+          customer_id: customer.id
+        }
+      })
     }
 
     const token = jwt.sign(
@@ -151,37 +171,59 @@ export const linkedinCallback = async (req: Request, res: Response) => {
           : user.expertProfile,
     };
 
+    res.redirect(
+      `elearningapp://ParentScreen?token=${token}&data=${encodeURIComponent(
+        JSON.stringify(responseData)
+      )}`
+    );
+    return
 
-    res.json({
-      message: "Authentication successful",
-      token,
-      user: responseData,
-    });
+    // res.json({
+    //   message: "Authentication successful",
+    //   token,
+    //   user: responseData,
+    //   redirect_url: 'elearningapp://ParentScreen'
+    // });
   } catch (error) {
     console.error("Authentication error:", error);
-
-    const statusCode =
-      error instanceof Error && error.message.includes("status:") ? 502 : 500;
     const errorMessage =
       error instanceof Error ? error.message : "Internal server error";
 
-    res.status(statusCode).json({
-      message: "Authentication failed",
-      error: errorMessage,
-    });
+    const statusCode =
+      error instanceof Error && error.message.includes("status:") ? 502 : 500;
+
+    res.redirect(`elearningapp://FailedLogin?error=${errorMessage}`)
+
+    // res.status(statusCode).json({
+    //   message: "Authentication failed",
+    //   error: errorMessage,
+    // });
   }
 };
 
 export const updateUser = async (
   req: AuthenticatedRequest,
   res: Response
-): Promise<void> => {
+): Promise<any> => {
   try {
     const userId = req.user?.id;
-    const { name, email, profile } = req.body;
-    const newImage = req.file;
 
-    const currentUser = await prisma.user.findUnique({
+    const { data, error, success } = updateUserSchema.safeParse(req.body);
+    if (!success) {
+      if (!success) {
+        return res.status(400).json({
+          success: false,
+          errors: JSON.parse(error.message).map(err => ({
+            field: err.path.join("."),
+            message: err.message,
+          })),
+        });
+      }
+    }
+
+    const newImage = req?.file;
+
+    const currentUser = await prisma.users.findUnique({
       where: { id: userId },
       include: {
         studentProfile: true,
@@ -209,61 +251,61 @@ export const updateUser = async (
     }
 
     // Update basic user data
-    const updatedUser = await prisma.user.update({
+    const updatedUser = await prisma.users.update({
       where: { id: userId },
       data: {
-        name: name || currentUser.name,
-        email: email || currentUser.email,
+        name: data.name || currentUser.name,
+        email: data.email || currentUser.email,
         image: newImage ? newImage.filename : currentUser.image,
         // Update profile based on activeProfile
         ...(currentUser.activeProfile === "STUDENT" && {
-          studentProfile: profile
+          studentProfile: data.profile
             ? {
-                upsert: {
-                  create: {
-                    profession: profile.profession,
-                    organization: profile.organization,
-                    location: profile.location,
-                    description: profile.description,
-                  },
-                  update: {
-                    profession: profile.profession,
-                    organization: profile.organization,
-                    location: profile.location,
-                    description: profile.description,
-                  },
+              upsert: {
+                create: {
+                  profession: data.profile.profession,
+                  organization: data.profile.organization,
+                  location: data.profile.location,
+                  description: data.profile.description,
                 },
-              }
+                update: {
+                  profession: data.profile.profession,
+                  organization: data.profile.organization,
+                  location: data.profile.location,
+                  description: data.profile.description,
+                },
+              },
+            }
             : undefined,
         }),
         ...(currentUser.activeProfile === "EXPERT" && {
-          expertProfile: profile
+          expertProfile: data.profile
             ? {
-                upsert: {
-                  create: {
-                    profession: profile.profession,
-                    organization: profile.organization,
-                    location: profile.location,
-                    description: profile.description,
-                    experience: profile.experience,
-                    hourlyRate: profile.hourlyRate,
-                    skills: profile.skills,
-                    availableDays: profile.availableDays,
-                    availableTime: profile.availableTime,
-                  },
-                  update: {
-                    profession: profile.profession,
-                    organization: profile.organization,
-                    location: profile.location,
-                    description: profile.description,
-                    experience: profile.experience,
-                    hourlyRate: profile.hourlyRate,
-                    skills: profile.skills,
-                    availableDays: profile.availableDays,
-                    availableTime: profile.availableTime,
-                  },
+              upsert: {
+                create: {
+                  profession: data.profile.profession,
+                  organization: data.profile.organization,
+                  location: data.profile.location,
+                  description: data.profile.description,
+                  experience: data.profile.experience,
+                  hourlyRate: data.profile.hourlyRate,
+                  skills: data.profile.skills,
+                  availableDays: data.profile.availableDays,
+                  availableTime: data.profile.availableTime,
                 },
-              }
+                update: {
+                  profession: data.profile.profession,
+                  organization: data.profile.organization,
+                  location: data.profile.location,
+                  description: data.profile.description,
+                  experience: data.profile.experience,
+                  hourlyRate: data.profile.hourlyRate,
+                  skills: data.profile.skills,
+                  availableDays: data.profile.availableDays,
+                  availableTime: data.profile.availableTime,
+                },
+              },
+            }
             : undefined,
         }),
       },
@@ -316,7 +358,7 @@ export const updateUser = async (
   }
 };
 
-export const beExpart = async (
+export const beExpert = async (
   req: AuthenticatedRequest,
   res: Response
 ): Promise<void> => {
@@ -350,7 +392,7 @@ export const beExpart = async (
     const missingField = requiredFields.find((field) => !req.body[field]);
 
     // Find current user with profile
-    const currentUser = await prisma.user.findUnique({
+    const currentUser = await prisma.users.findUnique({
       where: { id: userId },
       include: {
         studentProfile: true,
@@ -384,37 +426,37 @@ export const beExpart = async (
     }
 
     // Create or update the expert profile
-    const updatedUser = await prisma.user.update({
+    const updatedUser = await prisma.users.update({
       where: { id: userId },
       data: {
         activeProfile: "EXPERT",
         expertProfile: currentUser.expertProfile
           ? {
-              update: {
-                profession,
-                organization,
-                location,
-                description,
-                experience,
-                hourlyRate,
-                skills,
-                availableDays,
-                availableTime,
-              },
-            }
-          : {
-              create: {
-                profession,
-                organization,
-                location,
-                description,
-                experience,
-                hourlyRate,
-                skills,
-                availableDays,
-                availableTime,
-              },
+            update: {
+              profession,
+              organization,
+              location,
+              description,
+              experience,
+              hourlyRate,
+              skills,
+              availableDays,
+              availableTime,
             },
+          }
+          : {
+            create: {
+              profession,
+              organization,
+              location,
+              description,
+              experience,
+              hourlyRate,
+              skills,
+              availableDays,
+              availableTime,
+            },
+          },
       },
       include: {
         studentProfile: true,
@@ -466,7 +508,7 @@ export const beStudent = async (
   try {
     const userId = req.user?.id;
 
-    const currentUser = await prisma.user.findUnique({
+    const currentUser = await prisma.users.findUnique({
       where: { id: userId },
       include: {
         studentProfile: true,
@@ -482,7 +524,7 @@ export const beStudent = async (
       return;
     }
 
-    const updatedUser = await prisma.user.update({
+    const updatedUser = await prisma.users.update({
       where: { id: userId },
       data: {
         activeProfile: "STUDENT",
@@ -543,7 +585,7 @@ export const fordev = async (req: Request, res: Response) => {
     }
 
     // Find user
-    const user = await prisma.user.findUnique({ where: { email } });
+    const user = await prisma.users.findUnique({ where: { email } });
     if (!user) {
       res.status(401).json({ success: false, message: "Invalid credentials" });
       return;
@@ -562,7 +604,7 @@ export const fordev = async (req: Request, res: Response) => {
     );
 
     // Optional: Update lastLogin
-    let data = await prisma.user.update({
+    let data = await prisma.users.update({
       where: { id: user.id },
       data: { lastLogin: new Date() },
     });
@@ -587,33 +629,51 @@ export const fordevSignup = async (req: Request, res: Response) => {
     const { name, email } = req.body;
 
     if (!name || !email) {
-       res.status(400).json({
+      res.status(400).json({
         success: false,
         message: "Name and email are required",
       });
     }
 
-    const existingUser = await prisma.user.findUnique({ where: { email } });
+    const existingUser = await prisma.users.findUnique({ where: { email } });
     if (existingUser) {
-       res.status(409).json({
+      res.status(409).json({
         success: false,
         message: "User already exists. Please login instead.",
       });
     }
 
 
-    const newUser = await prisma.user.create({
+    const newUser = await prisma.users.create({
       data: {
         name,
         email,
         lastLogin: new Date(),
-        linkedInId: uuidv4(),
+        linkedin_id: uuidv4(),
       },
       include: {
         studentProfile: true,
         expertProfile: true,
       },
     });
+
+    const customer = await stripe.customers.create({
+      name: newUser.name,
+      email: newUser.email,
+      metadata: {
+        user_id: newUser.id,
+      },
+      description: 'New Customer create from e-learning app.',
+    })
+
+    await prisma.users.update({
+      where: {
+        id: newUser.id
+      },
+      data: {
+        customer_id: customer.id
+      }
+    })
 
     const token = jwt.sign(
       {
@@ -653,23 +713,27 @@ export const fordevSignup = async (req: Request, res: Response) => {
 // admin login
 export const adminLogin = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { email, password } = req.body;
 
-    // check if email and password are provided
-    if (!email || !password) {
-      res.status(400).json({ success: false, message: "Email and password are required" });
-      return;
+    const body = loginSchema.safeParse(req.body);
+    if (!body.success) {
+      res.status(400).json({
+        success: false,
+        message: "Invalid query parameters",
+        errors: body.error.flatten().fieldErrors,
+      });
+      return
     }
 
+    const { email, password } = body.data
+
     // check if email and password are correct
-    const user = await prisma.user.findUnique({ where: { email } });
+    const user = await prisma.users.findUnique({ where: { email } });
     if (!user) {
       res.status(401).json({ success: false, message: "Invalid credentials" });
       return;
     }
     // check if password is correct
-    // const isPasswordCorrect = await bcrypt.compare(password, user.password); 
-    const isPasswordCorrect = password === user.password;
+    const isPasswordCorrect = await bcrypt.compare(password, user.password);
 
     if (!isPasswordCorrect) {
       res.status(401).json({ success: false, message: "Invalid credentials" });
@@ -685,14 +749,54 @@ export const adminLogin = async (req: Request, res: Response): Promise<void> => 
     });
 
     await sendVerificationOTP(email, otp);
-  
-    res.status(200).json({
-        otp,
-        success: true,
-        message: "OTP sent successfully",
-    });
-    
 
+    res.status(200).json({
+      otp,
+      success: true,
+      message: "OTP sent successfully",
+    });
+
+
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error instanceof Error ? error.message : "Internal server error",
+    });
+  }
+}
+
+export const register = async (req: Request, res: Response) => {
+  try {
+    const body = registerSchema.safeParse(req.body);
+    if (!body.success) {
+      res.status(400).json({
+        success: false,
+        message: "Invalid query parameters",
+        errors: body.error.flatten().fieldErrors,
+      });
+      return
+    }
+
+    const { email, name, password } = body.data
+
+    const hashedPassword = bcrypt.hashSync(password, 12)
+
+    const payload = {
+      name,
+      email,
+      password: hashedPassword
+    }
+
+    await prisma.users.create({
+      data: {
+        linkedin_id: uuidv4(),
+        ...payload
+      }
+    })
+
+    res.status(201).json({
+      message: 'User created successfully.',
+    })
   } catch (error) {
     res.status(500).json({
       success: false,
@@ -704,7 +808,18 @@ export const adminLogin = async (req: Request, res: Response): Promise<void> => 
 // verification otp for admin login
 export const verifyOTP = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { email, otp } = req.body;
+
+    const body = verifyLoginSchema.safeParse(req.body);
+    if (!body.success) {
+      res.status(400).json({
+        success: false,
+        message: "Invalid query parameters",
+        errors: body.error.flatten().fieldErrors,
+      });
+      return
+    }
+
+    const { email, otp } = body.data
 
     const userCode = await prisma.ucode.findFirst({ where: { email } });
     if (!userCode) {
@@ -721,13 +836,13 @@ export const verifyOTP = async (req: Request, res: Response): Promise<void> => {
       id: userCode.userId,
     }, process.env.JWT_SECRET as string, { expiresIn: "7d" });
 
-    const user = await prisma.user.findUnique({ where: { id: userCode.userId } });
+    const user = await prisma.users.findUnique({ where: { id: userCode.userId } });
     if (!user) {
       res.status(401).json({ success: false, message: "Invalid credentials" });
       return;
     }
 
-    const {password:_, ...userWithoutPassword} = user;
+    const { password: _, ...userWithoutPassword } = user;
 
     res.status(200).json({
       success: true,
@@ -750,7 +865,7 @@ export const resendOTP = async (req: Request, res: Response): Promise<void> => {
   try {
     const { email } = req.body;
 
-    const user = await prisma.user.findFirst({ where: { email } });
+    const user = await prisma.users.findFirst({ where: { email } });
     if (!user) {
       res.status(401).json({ success: false, message: "Invalid credentials" });
       return;
@@ -765,7 +880,7 @@ export const resendOTP = async (req: Request, res: Response): Promise<void> => {
       await prisma.ucode.update({
         where: { id: existingUcode.id },
         data: {
-          otp: otp, 
+          otp: otp,
         },
       });
     } else {
@@ -780,7 +895,7 @@ export const resendOTP = async (req: Request, res: Response): Promise<void> => {
     }
 
     await sendVerificationOTP(email, otp);
-  
+
   } catch (error) {
     res.status(500).json({
       success: false,
@@ -789,27 +904,3 @@ export const resendOTP = async (req: Request, res: Response): Promise<void> => {
   }
 }
 
-// import React from "react";
-
-// const Login = () => {
-//   const handleLogin = () => {
-//     const params = new URLSearchParams({
-//       response_type: "code",
-//       client_id: "785hgn6asywpg6",
-//       redirect_uri: "http://192.168.4.3:8000/auth/linkedin/callback",
-//       scope: "openid email profile",
-//     });
-//     window.location.href = `https://www.linkedin.com/oauth/v2/authorization?${params.toString()}`;
-//   };
-//   return (
-//     <div>
-//       <h1>Linkdin Login</h1>
-
-//       <button onClick={handleLogin}>Signin with Linkdin</button>
-//     </div>
-//   );
-// };
-
-// export default Login;
-
-// eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6ImNtYzRkejAzcjAwMDB1b3R3M3J4ZnJjcGkiLCJlbWFpbCI6InRxbWhvc2FpbkBnbWFpbC5jb20iLCJuYW1lIjoiVFFNIEhvc2FpbiIsImFjdGl2ZVByb2ZpbGUiOiJTVFVERU5UIiwiaWF0IjoxNzUwMzk4MzMwLCJleHAiOjE3NTEwMDMxMzB9.JoosjkTH57iFeRIf2NceGAYR99jaJ7M99HWhSrtu2pc

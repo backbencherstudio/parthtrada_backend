@@ -1,7 +1,8 @@
 import { Request, Response } from "express";
 import { PrismaClient } from "@prisma/client";
 import Stripe from "stripe";
-import { AuthenticatedRequest } from "../../../middleware/verifyUsers";
+import type { AuthenticatedRequest } from "@/middleware/verifyUsers";
+import fs from 'fs';
 
 const prisma = new PrismaClient();
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
@@ -48,13 +49,13 @@ export const createStripeAccount = async (
       data: { stripeAccountId: account.id },
     });
 
-    res.json({
+    return res.json({
       success: true,
       message: "Stripe account created",
       accountId: account.id,
     });
   } catch (error) {
-    console.error("Error creating Stripe account:", error);
+    console.error("Error creating Stripe account:", error?.message);
     res.status(500).json({
       success: false,
       message: "Failed to create Stripe account",
@@ -151,3 +152,42 @@ export const checkOnboardingStatus = async (
     });
   }
 };
+
+export const updateOnboardStatus = async (req: Request, res: Response) => {
+  try {
+    const account_id = req.params.id
+    await prisma.expertProfile.update({
+      where: {
+        stripeAccountId: account_id
+      },
+      data: {
+        isOnboardCompleted: true
+      }
+    })
+    return res.status(200).json({
+      success: true,
+      message: 'Status updated.',
+      account_id
+    })
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: 'Something went wrong.'
+    })
+  }
+}
+
+export const webhook = async (req: Request, res: Response) => {
+  let event = req.body;
+  switch (event.type) {
+    case 'payment_intent.succeeded':
+      const data = event.data.object
+      console.log(`Payment intent Succeeded ${JSON.stringify(data)}.`);
+
+      break;
+    default:
+      return
+  }
+
+  res.json({ received: true });
+}

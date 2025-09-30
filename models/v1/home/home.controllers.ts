@@ -1,14 +1,8 @@
-import type { Response } from "express";
+import type { Request, Response } from "express";
 import { Prisma, PrismaClient } from "@prisma/client";
-import Stripe from "stripe";
 import type { AuthenticatedRequest } from "../../../middleware/verifyUsers";
-import moment from 'moment-timezone'
-import { createZoomMeeting } from '../../../utils/zoom.utils'
 
 const prisma = new PrismaClient();
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
-
-
 
 export const getExperts = async (req: AuthenticatedRequest, res: Response) => {
   try {
@@ -18,11 +12,11 @@ export const getExperts = async (req: AuthenticatedRequest, res: Response) => {
     const limitNum = parseInt(limit as string, 10);
     const skip = (pageNum - 1) * limitNum;
 
-    const where: Prisma.UserWhereInput = {
+    const where: Prisma.UsersWhereInput = {
       activeProfile: 'EXPERT',
     };
 
-    const andConditions: Prisma.UserWhereInput[] = [];
+    const andConditions: Prisma.UsersWhereInput[] = [];
 
     if (search && (search as string).trim() !== '') {
       const searchString = search as string;
@@ -48,7 +42,7 @@ export const getExperts = async (req: AuthenticatedRequest, res: Response) => {
       where.AND = andConditions;
     }
 
-    const experts = await prisma.user.findMany({
+    const experts = await prisma.users.findMany({
       where,
       include: {
         expertProfile: true,
@@ -60,7 +54,7 @@ export const getExperts = async (req: AuthenticatedRequest, res: Response) => {
       },
     });
 
-    const totalExperts = await prisma.user.count({ where });
+    const totalExperts = await prisma.users.count({ where });
 
     res.status(200).json({
       success: true,
@@ -95,7 +89,7 @@ export const getExpertById = async (req: AuthenticatedRequest, res: Response) =>
       return;
     }
 
-    const expert = await prisma.user.findUnique({
+    const expert = await prisma.users.findUnique({
       where: {
         id,
         activeProfile: 'EXPERT',
@@ -166,3 +160,35 @@ export const getSchedule = async (req: AuthenticatedRequest, res: Response) => {
     });
   }
 };
+
+export const stats = async (req: Request, res: Response) => {
+  try {
+    const [total_experts, total_bookings, total_users, avg_ratings] = await Promise.all([
+      prisma.expertProfile.count(),
+      prisma.booking.count(),
+      prisma.users.count(),
+      prisma.review.aggregate({
+        _avg: {
+          rating: true,
+        },
+      })
+    ])
+
+    res.status(200).json({
+      success: true,
+      message: "Stats fetched successfully",
+      data: {
+        mentors: total_experts,
+        sessions: total_bookings,
+        users: total_users,
+        rating: avg_ratings._avg.rating.toFixed(2)
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to get stats",
+      error: error instanceof Error ? error.message : "Internal server error",
+    });
+  }
+}

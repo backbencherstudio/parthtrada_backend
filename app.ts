@@ -5,10 +5,16 @@ import morgan from "morgan";
 import path from "path";
 import authRoutes from "./models/v1/auth/auth.routes";
 import booking from "./models/v1/booking/booking.routes";
-import chatRoutes from "./models/v1/chats/chats.routes";
-import adminRoutes from "./models/v1/admin-dashboard/admin.routes";
+// import chatRoutes from "./models/v1/chats/chats.routes";
+import dashboardRoutes from "./models/v1/dashboard/admin.routes";
 import homeRoutes from "./models/v1/home/home.routes";
-import expertRoutes from "./models/v1/expert-profile/expert.routes";
+import expertRoutes from "./models/v1/experts/expert.routes";
+import paymentRoutes from "./models/v1/payments/payment.routes";
+import profileRoutes from "./models/v1/profile/profile.routes";
+import reviewRoutes from "./models/v1/reviews/reviews.routes";
+import conversationsRoutes from "./models/v1/conversations/conversations.routes";
+import aiRoutes from "./models/v1/ai-assistant/ai.routes";
+import { setupIntent } from "./models/v1/booking/booking.controllers";
 
 const app = express();
 
@@ -34,12 +40,37 @@ app.use(express.json());
 app.use(morgan("dev"));
 
 app.use("/auth", authRoutes);
-app.use("/booking", booking);
-app.use("/chat", chatRoutes);
+app.use("/profile", profileRoutes);
+app.use("/dashboard", dashboardRoutes);
+app.use("/bookings", booking);
+// app.use("/chat", chatRoutes);
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
-app.use("/admin", adminRoutes);
 app.use("/home", homeRoutes);
-app.use("/expert", expertRoutes);
+app.use("/experts", expertRoutes);
+app.use("/payments", paymentRoutes);
+app.use("/reviews", reviewRoutes);
+app.use("/conversations", conversationsRoutes);
+app.use("/ai", aiRoutes);
+
+
+// For testing add ejs
+app.set("view engine", "ejs");
+app.set("views", path.join(__dirname, "views"));
+
+app.get("/add-card", async (req, res) => {
+  try {
+    const intent = await setupIntent()
+
+    res.render("index", {
+      publishableKey: 'pk_test_51S39GcLenvrEQJkbVfvGzHLbGEVeTgpoJFGv6ZMw5vvai6r2HQrusGhuSRaBASSDlUc9Y1R293qKduPfhqPKwtEw00PRFjI7Xa',
+      clientSecret: intent.clientSecret,
+      customerId: intent.customerId
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Failed to create SetupIntent");
+  }
+});
 
 app.use((req: Request, res: Response, next: NextFunction) => {
   res.status(404).json({

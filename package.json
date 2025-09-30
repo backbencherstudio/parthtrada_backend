@@ -6,7 +6,9 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node build/index.js",
     "build": "tsc",
-    "dev": "nodemon --exec ts-node index.ts"
+    "dev": "nodemon --exec ts-node -r tsconfig-paths/register index.ts",
+    "generate": "npx prisma generate",
+    "migrate": "prisma migrate dev"
   },
   "keywords": [],
   "author": "",
@@ -20,6 +22,7 @@
     "bcryptjs": "^3.0.2",
     "cors": "^2.8.5",
     "dotenv": "^16.5.0",
+    "ejs": "^3.1.10",
     "express": "^5.1.0",
     "jsonwebtoken": "^9.0.2",
     "moment-timezone": "^0.6.0",
@@ -27,10 +30,12 @@
     "multer": "^2.0.1",
     "nodemailer": "^7.0.3",
     "nodemon": "^3.1.10",
+    "openai": "^5.20.2",
     "socket.io": "^4.8.1",
     "stripe": "^18.2.1",
     "uuid": "^11.1.0",
-    "uuidv4": "^6.2.13"
+    "uuidv4": "^6.2.13",
+    "zod": "^4.1.5"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",
@@ -41,6 +46,7 @@
     "@types/node": "^22.15.29",
     "prisma": "^6.13.0",
     "ts-node-dev": "^2.0.0",
+    "tsconfig-paths": "^4.2.0",
     "typescript": "^5.8.3"
   }
 }
