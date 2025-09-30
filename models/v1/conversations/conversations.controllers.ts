@@ -3,7 +3,7 @@ import { PrismaClient } from "@prisma/client";
 import { AuthenticatedRequest } from "@/middleware/verifyUsers";
 import { createConversationSchema, sendMessageSchema } from "@/utils/validations";
 import { paginationQuerySchema } from "@/utils/queryValidation";
-import { NotificationService } from "@/services/notification";
+import { NotificationService } from "@/services/Notification";
 
 const prisma = new PrismaClient();
 const notification = new NotificationService()

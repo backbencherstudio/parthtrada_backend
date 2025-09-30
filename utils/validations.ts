@@ -100,3 +100,8 @@ export const sendMessageSchema = z.object({
   recipientRole: RoleEnum,
   content: z.string().min(1, "Content is required.")
 });
+
+
+export const profileSchema = z.object({
+  hourlyRate: z.number().optional()
+})

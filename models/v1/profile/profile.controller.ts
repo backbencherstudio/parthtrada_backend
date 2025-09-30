@@ -1,6 +1,7 @@
 import { AuthenticatedRequest } from "@/middleware/verifyUsers";
 import { Response } from "express";
 import { PrismaClient } from "@prisma/client";
+import { profileSchema } from "@/utils/validations";
 
 const prisma = new PrismaClient();
 
@@ -93,12 +94,18 @@ export const updateProfile = async (req: AuthenticatedRequest, res: Response) =>
         const user = req?.user;
         const role = user?.activeProfile;
         const id = user?.id;
+        const { data, error, success } = profileSchema.safeParse(req.body);
 
-        const body: Payload = req?.body;
-
-        if (!body) {
-            return res.status(400).json({ error: "Request body is required" });
+        if (!success) {
+            return res.status(400).json({
+                success: false,
+                errors: JSON.parse(error.message).map(err => ({
+                    field: err.path.join("."),
+                    message: err.message,
+                })),
+            });
         }
+
         const currentUser = await prisma.users.findUnique({
             where: { id },
         });
@@ -113,7 +120,7 @@ export const updateProfile = async (req: AuthenticatedRequest, res: Response) =>
         const userData: Payload = {};
         const profileData: Payload = {};
 
-        for (const [key, value] of Object.entries(body)) {
+        for (const [key, value] of Object.entries(data)) {
             if (userUpdatableFields.includes(key)) {
                 userData[key] = value;
             } else {

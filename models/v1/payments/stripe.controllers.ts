@@ -2,7 +2,6 @@ import { Request, Response } from "express";
 import { PrismaClient } from "@prisma/client";
 import Stripe from "stripe";
 import type { AuthenticatedRequest } from "@/middleware/verifyUsers";
-import fs from 'fs';
 
 const prisma = new PrismaClient();
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
@@ -26,6 +25,21 @@ export const createStripeAccount = async (
         message: "Only experts can create payment accounts",
       });
       return;
+    }
+
+    if (expert.stripeAccountId) {
+      res.status(400).json({
+        success: false,
+        message: 'Stripe account already created.'
+      })
+    }
+
+    if (expert.isOnboardCompleted) {
+      res.status(400).json({
+        success: false,
+        message: 'Stripe account already onboarded.'
+      })
+      return
     }
 
     // Create Stripe Connect account
