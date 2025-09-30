@@ -1,1 +1,2 @@
 1. Should be enable dynamic user id
+2. Should be enable check expert or not in auth.controller.ts line (411)

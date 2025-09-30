@@ -93,7 +93,7 @@ export const createConversationSchema = z.object({
 export const sendMessageSchema = z.object({
   conversationId: z
     .string()
-    .min(1, "Conversation ID is required"),
+    .optional(),
   recipientId: z
     .string()
     .min(1, "Recipient ID is required"),

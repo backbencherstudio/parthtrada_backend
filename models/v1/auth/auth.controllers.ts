@@ -408,13 +408,13 @@ export const beExpert = async (
       return;
     }
 
-    if (currentUser.expertProfile) {
-      res.status(400).json({
-        success: false,
-        message: "You are already an expert"
-      });
-      return;
-    }
+    // if (currentUser.expertProfile) {
+    //   res.status(400).json({
+    //     success: false,
+    //     message: "You are already an expert"
+    //   });
+    //   return;
+    // }
 
     // If expertProfile doesn't exist, all fields must be provided
     if (!currentUser.expertProfile && missingField) {
