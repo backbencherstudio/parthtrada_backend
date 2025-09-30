@@ -3,8 +3,10 @@ import { PrismaClient } from "@prisma/client";
 import { AuthenticatedRequest } from "@/middleware/verifyUsers";
 import { createConversationSchema, sendMessageSchema } from "@/utils/validations";
 import { paginationQuerySchema } from "@/utils/queryValidation";
+import { NotificationService } from "@/services/notification";
 
 const prisma = new PrismaClient();
+const notification = new NotificationService()
 
 // Create conversation
 export const createConversation = async (req: AuthenticatedRequest, res: Response) => {
@@ -21,15 +23,13 @@ export const createConversation = async (req: AuthenticatedRequest, res: Respons
 
   const { data, error, success } = createConversationSchema.safeParse(req.body);
   if (!success) {
-    if (!success) {
-      return res.status(400).json({
-        success: false,
-        errors: JSON.parse(error.message).map(err => ({
-          field: err.path.join("."),
-          message: err.message,
-        })),
-      });
-    }
+    return res.status(400).json({
+      success: false,
+      errors: JSON.parse(error.message).map(err => ({
+        field: err.path.join("."),
+        message: err.message,
+      })),
+    });
   }
 
   const { recipientId, recipientRole } = data;
@@ -140,16 +140,15 @@ export const sendMessage = async (req: AuthenticatedRequest, res: Response) => {
   }
 
   const { data, error, success } = sendMessageSchema.safeParse(req.body);
+
   if (!success) {
-    if (!success) {
-      return res.status(400).json({
-        success: false,
-        errors: JSON.parse(error.message).map(err => ({
-          field: err.path.join("."),
-          message: err.message,
-        })),
-      });
-    }
+    return res.status(400).json({
+      success: false,
+      errors: JSON.parse(error.message).map(err => ({
+        field: err.path.join("."),
+        message: err.message,
+      })),
+    });
   }
 
   const { content, conversationId, recipientId, recipientRole } = data
@@ -237,6 +236,9 @@ export const sendMessage = async (req: AuthenticatedRequest, res: Response) => {
         sender: { select: { id: true, name: true, image: true } },
       },
     });
+
+    // Send Notification
+    notification.sendMessage(recipientId, { title: `New message from ${message.sender.name}` })
 
     // 3) Bump conversation updatedAt
     await prisma.conversation.update({

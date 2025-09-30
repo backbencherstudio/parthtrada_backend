@@ -251,6 +251,7 @@ model Message {
   senderRole     Role
   recipientRole  Role
   content        String
+  read_message   Boolean      @default(false)
   conversation   Conversation @relation(fields: [conversationId], references: [id])
   sender         Users        @relation("SentMessages", fields: [senderId], references: [id])
   recipient      Users        @relation("ReceivedMessages", fields: [recipientId], references: [id])
