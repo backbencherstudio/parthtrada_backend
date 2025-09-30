@@ -5,13 +5,14 @@ import morgan from "morgan";
 import path from "path";
 import authRoutes from "./models/v1/auth/auth.routes";
 import booking from "./models/v1/booking/booking.routes";
-import chatRoutes from "./models/v1/chats/chats.routes";
+// import chatRoutes from "./models/v1/chats/chats.routes";
 import dashboardRoutes from "./models/v1/dashboard/admin.routes";
 import homeRoutes from "./models/v1/home/home.routes";
 import expertRoutes from "./models/v1/experts/expert.routes";
 import paymentRoutes from "./models/v1/payments/payment.routes";
 import profileRoutes from "./models/v1/profile/profile.routes";
 import reviewRoutes from "./models/v1/reviews/reviews.routes";
+import conversationsRoutes from "./models/v1/conversations/conversations.routes";
 import aiRoutes from "./models/v1/ai-assistant/ai.routes";
 import { setupIntent } from "./models/v1/booking/booking.controllers";
 
@@ -42,12 +43,13 @@ app.use("/auth", authRoutes);
 app.use("/profile", profileRoutes);
 app.use("/dashboard", dashboardRoutes);
 app.use("/bookings", booking);
-app.use("/chat", chatRoutes);
+// app.use("/chat", chatRoutes);
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 app.use("/home", homeRoutes);
 app.use("/experts", expertRoutes);
 app.use("/payments", paymentRoutes);
 app.use("/reviews", reviewRoutes);
+app.use("/conversations", conversationsRoutes);
 app.use("/ai", aiRoutes);
 
 

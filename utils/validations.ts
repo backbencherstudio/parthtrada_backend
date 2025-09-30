@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+export const RoleEnum = z.enum(["ADMIN", "EXPERT", "STUDENT"]);
+
 export const updateUserSchema = z.object({
   name: z.string().optional(),
   email: z.string().email().optional(),
@@ -79,4 +81,22 @@ export const adminProfileSchema = z.object({
 
 export const changeExpertStatus = z.object({
   status: z.enum(['ACTIVE', 'SUSPENDED']),
+});
+
+export const createConversationSchema = z.object({
+  recipientId: z
+    .string()
+    .min(1, "Recipient ID is required"),
+  recipientRole: RoleEnum,
+});
+
+export const sendMessageSchema = z.object({
+  conversationId: z
+    .string()
+    .min(1, "Conversation ID is required"),
+  recipientId: z
+    .string()
+    .min(1, "Recipient ID is required"),
+  recipientRole: RoleEnum,
+  content: z.string().min(1, "Content is required.")
 });

@@ -28,14 +28,14 @@ model AdminProfile {
 }
 
 model StudentProfile {
-  id                 String     @id @default(cuid())
-  profession         String?
-  organization       String?
-  location           String?
-  description        String?
-  userId             String     @unique
-  chatRoomsAsStudent ChatRoom[] @relation("StudentProfileToChatRoom")
-  user               Users      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id           String  @id @default(cuid())
+  profession   String?
+  organization String?
+  location     String?
+  description  String?
+  userId       String  @unique
+  // chatRoomsAsStudent ChatRoom[] @relation("StudentProfileToChatRoom")
+  user         Users   @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model ExpertProfile {
@@ -53,7 +53,7 @@ model ExpertProfile {
   stripeAccountId    String?             @unique
   isOnboardCompleted Boolean             @default(false)
   userId             String              @unique
-  chatRoomsAsExpert  ChatRoom[]          @relation("ExpertProfileToChatRoom")
+  // chatRoomsAsExpert  ChatRoom[]          @relation("ExpertProfileToChatRoom")
   user               Users               @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
@@ -133,30 +133,30 @@ model Notification {
   recipient   Users            @relation(fields: [recipientId], references: [id], onDelete: Cascade)
 }
 
-model ChatRoom {
-  id        String          @id @default(cuid())
-  studentId String?
-  expertId  String?
-  createdAt DateTime        @default(now())
-  updatedAt DateTime        @updatedAt
-  expert    ExpertProfile?  @relation("ExpertProfileToChatRoom", fields: [expertId], references: [id])
-  student   StudentProfile? @relation("StudentProfileToChatRoom", fields: [studentId], references: [id])
-  messages  Message[]
+// model ChatRoom {
+//   id        String          @id @default(cuid())
+//   studentId String?
+//   expertId  String?
+//   createdAt DateTime        @default(now())
+//   updatedAt DateTime        @updatedAt
+//   expert    ExpertProfile?  @relation("ExpertProfileToChatRoom", fields: [expertId], references: [id])
+//   student   StudentProfile? @relation("StudentProfileToChatRoom", fields: [studentId], references: [id])
+//   messages  Message[]
 
-  @@unique([studentId, expertId])
-}
+//   @@unique([studentId, expertId])
+// }
 
-model Message {
-  id         String   @id @default(cuid())
-  content    String
-  senderType Role
-  senderId   String
-  chatRoomId String
-  isRead     Boolean  @default(false)
-  isAI       Boolean  @default(false)
-  createdAt  DateTime @default(now())
-  chatRoom   ChatRoom @relation(fields: [chatRoomId], references: [id], onDelete: Cascade)
-}
+// model Message {
+//   id         String   @id @default(cuid())
+//   content    String
+//   senderType Role
+//   senderId   String
+//   chatRoomId String
+//   isRead     Boolean  @default(false)
+//   isAI       Boolean  @default(false)
+//   createdAt  DateTime @default(now())
+//   chatRoom   ChatRoom @relation(fields: [chatRoomId], references: [id], onDelete: Cascade)
+// }
 
 model PaymentMethod {
   id        String  @id @default(cuid())
@@ -171,30 +171,34 @@ model PaymentMethod {
 }
 
 model Users {
-  id              String          @id @default(cuid())
-  linkedin_id     String          @unique
-  name            String?
-  email           String?         @unique
-  phone           String?
-  password        String?
-  lastLogin       DateTime?
-  image           String?
-  activeProfile   Role            @default(STUDENT)
-  timezone        String?
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
-  expertBookings  Booking[]       @relation("ExpertBookings")
-  studentBookings Booking[]       @relation("StudentBookings")
-  expertProfile   ExpertProfile?
-  notifications   Notification[]
-  customer_id     String?
-  payment_methods PaymentMethod[]
-  expertReviews   Review[]        @relation("ExpertReview")
-  studentReviews  Review[]        @relation("StudentReview")
-  studentProfile  StudentProfile?
-  adminProfile    AdminProfile?
-  ucode           Ucode?
-  transactions    Transaction[]   @relation("Transactions")
+  id                    String          @id @default(cuid())
+  linkedin_id           String          @unique
+  name                  String?
+  email                 String?         @unique
+  phone                 String?
+  password              String?
+  lastLogin             DateTime?
+  image                 String?
+  activeProfile         Role            @default(STUDENT)
+  timezone              String?
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
+  expertBookings        Booking[]       @relation("ExpertBookings")
+  studentBookings       Booking[]       @relation("StudentBookings")
+  expertProfile         ExpertProfile?
+  notifications         Notification[]
+  customer_id           String?
+  payment_methods       PaymentMethod[]
+  expertReviews         Review[]        @relation("ExpertReview")
+  studentReviews        Review[]        @relation("StudentReview")
+  studentProfile        StudentProfile?
+  adminProfile          AdminProfile?
+  ucode                 Ucode?
+  transactions          Transaction[]   @relation("Transactions")
+  sentConversations     Conversation[]  @relation("SentConversations")
+  receivedConversations Conversation[]  @relation("ReceivedConversations")
+  sentMessages          Message[]       @relation("SentMessages")
+  receivedMessages      Message[]       @relation("ReceivedMessages")
 }
 
 enum BookingStatus {
@@ -222,6 +226,35 @@ enum WithdrawalMethod {
   WALLET
   BANK
   STRIPE
+}
+
+model Conversation {
+  id            String    @id @default(cuid())
+  senderId      String
+  recipientId   String
+  senderRole    Role
+  recipientRole Role
+  sender        Users     @relation("SentConversations", fields: [senderId], references: [id])
+  recipient     Users     @relation("ReceivedConversations", fields: [recipientId], references: [id])
+  messages      Message[]
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@unique([senderId, recipientId, senderRole, recipientRole])
+}
+
+model Message {
+  id             String       @id @default(cuid())
+  conversationId String
+  senderId       String
+  recipientId    String
+  senderRole     Role
+  recipientRole  Role
+  content        String
+  conversation   Conversation @relation(fields: [conversationId], references: [id])
+  sender         Users        @relation("SentMessages", fields: [senderId], references: [id])
+  recipient      Users        @relation("ReceivedMessages", fields: [recipientId], references: [id])
+  createdAt      DateTime     @default(now())
 }
 
 enum Role {

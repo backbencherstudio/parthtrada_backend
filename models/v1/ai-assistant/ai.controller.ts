@@ -30,15 +30,15 @@ export async function handleStudentQuery(req: any, res: any) {
                     },
                     include: {
                         user: { select: { name: true, email: true } },
-                        chatRoomsAsExpert: true
+                        // chatRoomsAsExpert: true
                     }
                 });
 
-                dbData = experts.filter(expert =>
-                    !expert.chatRoomsAsExpert.some(room =>
-                        room.createdAt.toISOString().slice(0, 10) === date
-                    )
-                );
+                // dbData = experts.filter(expert =>
+                //     !expert.chatRoomsAsExpert.some(room =>
+                //         room.createdAt.toISOString().slice(0, 10) === date
+                //     )
+                // );
                 break;
 
             case "Reviews":
