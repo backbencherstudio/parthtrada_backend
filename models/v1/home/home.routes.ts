@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { verifyUser } from '../../../middleware/verifyUsers';
-import { getExperts, getExpertById, getSchedule, stats } from './home.controllers';
+import { getExperts, getExpertById, getSchedule, stats } from './home.controller';
 
 const router = Router();
 

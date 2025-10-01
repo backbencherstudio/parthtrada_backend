@@ -14,9 +14,13 @@ import profileRoutes from "./models/v1/profile/profile.routes";
 import reviewRoutes from "./models/v1/reviews/reviews.routes";
 import conversationsRoutes from "./models/v1/conversations/conversations.routes";
 import aiRoutes from "./models/v1/ai-assistant/ai.routes";
+import s_webhookRoutes from './models/v1/stripe/webhook/webhook.routes'
 import { setupIntent } from "./models/v1/booking/booking.controllers";
+import bodyParser from "body-parser";
 
 const app = express();
+
+// app.use("/webhook", bodyParser.raw({ type: "application/json" }));
 
 app.use(
   cors({
@@ -35,6 +39,8 @@ app.use(
   })
 );
 
+app.use("/stripe", s_webhookRoutes);
+
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(morgan("dev"));
@@ -51,7 +57,6 @@ app.use("/payments", paymentRoutes);
 app.use("/reviews", reviewRoutes);
 app.use("/conversations", conversationsRoutes);
 app.use("/ai", aiRoutes);
-
 
 // For testing add ejs
 app.set("view engine", "ejs");
