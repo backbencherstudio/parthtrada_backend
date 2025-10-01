@@ -105,3 +105,6 @@ export const sendMessageSchema = z.object({
 export const profileSchema = z.object({
   hourlyRate: z.number().optional()
 })
+export const cardSchema = z.object({
+  token: z.string(),
+})

@@ -1,19 +1,13 @@
-import express, { Request, Response, Router } from 'express';
-import { addCard, balance, confirmPayment, createSetupIntent, getCards, payouts, refundTransaction } from './payment.controller';
+import express, { Router } from 'express';
+import { balance, confirmPayment, createCard, getCards, payouts, refundTransaction } from './payment.controller';
 import { verifyUser } from '@/middleware/verifyUsers';
 import { checkOnboardingStatus, createStripeAccount, getOnboardingLink, updateOnboardStatus, webhook } from './stripe.controllers';
 
 const router = Router()
 
-router.post('/create-setup-intent', createSetupIntent)
-router.post('/cards', addCard)
+router.post('/add-card', verifyUser("ANY"), createCard)
 router.get('/cards', verifyUser('ANY'), getCards)
 router.post("/confirm-payment", verifyUser("ANY"), confirmPayment);
-
-// for dev
-router.get('/add-card', async (req: Request, res: Response) => {
-  res.render("index");
-})
 
 // expert routes
 router.post("/experts/refund", verifyUser("EXPERT"), refundTransaction);

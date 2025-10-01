@@ -1,65 +1,53 @@
 import { Request, Response } from "express";
 import { PrismaClient } from "@prisma/client";
 import { AuthenticatedRequest } from "@/middleware/verifyUsers";
-import { confirmPaymentSchema, payoutsSchema, refundTransactionSchema, savePaymentMethodSchema } from "@/utils/validations";
+import { cardSchema, confirmPaymentSchema, payoutsSchema, refundTransactionSchema, savePaymentMethodSchema } from "@/utils/validations";
 import stripe from "@/services/stripe";
 
 const prisma = new PrismaClient();
 
-export const createSetupIntent = async (req: Request, res: Response) => {
+export const createCard = async (req: AuthenticatedRequest, res: Response) => {
   try {
-    // const user_id = req.user?.id;
-    const user_id = 'cmfqhg38d0000vcewcw00fcwk';
+    const user_id = req.user?.id
     const user = await prisma.users.findUnique({
       where: {
-        id: user_id
+        id: user_id,
       }
     })
 
-    const setup_intent = await stripe.setupIntents.create({
-      customer: user.customer_id,
-      automatic_payment_methods: { enabled: true, allow_redirects: 'never' },
-    })
-
-    return res.status(201).json({
-      success: true,
-      client_secret: setup_intent.client_secret
-    })
-
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: "Failed to create setup intent",
-      error: error instanceof Error ? error.message : "Internal server error",
-    });
-  }
-}
-
-export const addCard = async (req: Request, res: Response) => {
-  try {
-    const { data, error, success } = savePaymentMethodSchema.safeParse(req.body);
-    if (!success) {
-      if (!success) {
-        return res.status(400).json({
-          success: false,
-          errors: JSON.parse(error.message).map(err => ({
-            field: err.path.join("."),
-            message: err.message,
-          })),
-        });
-      }
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found.'
+      })
     }
 
-    const userId = 'cmfqhg38d0000vcewcw00fcwk';
-    const pm_id = data.paymentMethodId
+    const { data: body, error, success } = cardSchema.safeParse(req.body);
 
-    const paymentMethod = await stripe.paymentMethods.retrieve(pm_id);
+    if (!success) {
+      return res.status(400).json({
+        success: false,
+        errors: JSON.parse(error.message).map(err => ({
+          field: err.path.join("."),
+          message: err.message,
+        })),
+      });
+    }
+
+    const { token } = body;
+
+    const paymentMethod = await stripe.paymentMethods.create({
+      type: 'card',
+      card: { token }
+    });
+
+    await stripe.paymentMethods.attach(paymentMethod.id, { customer: user.customer_id });
 
     const payload = {
-      provider: data.provider,
-      method_id: paymentMethod.id,
-      userId,
+      provider: 'stripe',
+      userId: user_id,
       brand: paymentMethod.card.brand,
+      method_id: paymentMethod.id,
       expMonth: paymentMethod.card.exp_month,
       expYear: paymentMethod.card.exp_year,
       last4: paymentMethod.card.last4,
@@ -70,10 +58,11 @@ export const addCard = async (req: Request, res: Response) => {
     })
 
     return res.status(201).json({
-      message: 'Payment Method Saved.'
+      message: 'Payment Method Saved.',
+      paymentMethodId: paymentMethod.id
     })
-  } catch (error) {
-    return res.status(500).json({ success: false, message: 'Something went wrong.' })
+  } catch (err: any) {
+    res.status(400).json({ success: false, message: err.message });
   }
 }
 

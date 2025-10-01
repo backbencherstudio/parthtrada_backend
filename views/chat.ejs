@@ -1,0 +1,86 @@
+<!-- Example EJS chat UI -->
+<div>
+  <h3>Online Users</h3>
+  <ul id="online-users"></ul>
+</div>
+
+<div>
+  <h3>Chat</h3>
+  <div id="messages"></div>
+  <div id="typing-indicator" style="color:gray;"></div>
+  <input id="message-input" autocomplete="off" placeholder="Type a message..." />
+  <button id="send-btn">Send</button>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+  // Get query params
+  function getQueryParam(name) {
+    const urlParams = new URLSearchParams(window.location.search);
+    return urlParams.get(name);
+  }
+
+  const userId = getQueryParam("userId");
+  const conversationId = getQueryParam("conversationId");
+  const userName = getQueryParam("userName") || "You";
+
+  const socket = io();
+
+  // Join events
+  socket.emit("join", userId);
+  socket.emit("join-conversation", conversationId);
+
+  // Online users
+  socket.on("online-users", (users) => {
+    const list = document.getElementById("online-users");
+    list.innerHTML = "";
+    users.forEach(u => {
+      const li = document.createElement("li");
+      li.textContent = u;
+      list.appendChild(li);
+    });
+  });
+
+  // Typing indicator
+  const typingIndicator = document.getElementById("typing-indicator");
+  socket.on("typing", ({ userId }) => {
+    typingIndicator.textContent = userId + " is typing...";
+  });
+  socket.on("stop-typing", ({ userId }) => {
+    typingIndicator.textContent = "";
+  });
+
+  // New message
+  socket.on("new-message", (msg) => {
+    const messagesDiv = document.getElementById("messages");
+    const div = document.createElement("div");
+    div.textContent = (msg.sender?.name || msg.senderId || "User") + ": " + msg.content;
+    messagesDiv.appendChild(div);
+  });
+
+  // Send message
+  document.getElementById("send-btn").onclick = () => {
+    const input = document.getElementById("message-input");
+    const content = input.value;
+    if (content) {
+      socket.emit("new-message", {
+        conversationId,
+        sender: { name: userName },
+        senderId: userId,
+        content
+      });
+      input.value = "";
+      socket.emit("stop-typing", { conversationId, userId });
+    }
+  };
+
+  // Typing events
+  let typingTimeout;
+  document.getElementById("message-input").addEventListener("input", () => {
+    socket.emit("typing", { conversationId, userId });
+    clearTimeout(typingTimeout);
+    typingTimeout = setTimeout(() => {
+      socket.emit("stop-typing", { conversationId, userId });
+    }, 1000);
+  });
+</script>

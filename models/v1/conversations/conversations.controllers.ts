@@ -3,10 +3,10 @@ import { PrismaClient } from "@prisma/client";
 import { AuthenticatedRequest } from "@/middleware/verifyUsers";
 import { createConversationSchema, sendMessageSchema } from "@/utils/validations";
 import { paginationQuerySchema } from "@/utils/queryValidation";
-import { NotificationService } from "@/services/Notification";
+import { io } from "@/socketServer";
+
 
 const prisma = new PrismaClient();
-const notification = new NotificationService()
 
 // Create conversation
 export const createConversation = async (req: AuthenticatedRequest, res: Response) => {
@@ -48,7 +48,9 @@ export const createConversation = async (req: AuthenticatedRequest, res: Respons
     include: { sender: true, recipient: true },
   });
 
-  if (existing) return res.json(existing);
+  if (existing) {
+    return res.json(existing);
+  }
 
   const conversation = await prisma.conversation.create({
     data: {
@@ -237,8 +239,7 @@ export const sendMessage = async (req: AuthenticatedRequest, res: Response) => {
       },
     });
 
-    // Send Notification
-    notification.sendMessage(recipientId, { title: `New message from ${message.sender.name}` })
+    io.to(conversation.id).emit("new-message", message)
 
     // 3) Bump conversation updatedAt
     await prisma.conversation.update({

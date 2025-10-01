@@ -77,6 +77,15 @@ app.get("/add-card", async (req, res) => {
   }
 });
 
+app.get("/chat-abc", async (req, res) => {
+  try {
+    res.render("chat");
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Failed to create SetupIntent");
+  }
+});
+
 app.use((req: Request, res: Response, next: NextFunction) => {
   res.status(404).json({
     message: `404 route not found`,
