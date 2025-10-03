@@ -4,6 +4,7 @@ import { AuthenticatedRequest } from "@/middleware/verifyUsers";
 import { createConversationSchema, sendMessageSchema } from "@/utils/validations";
 import { paginationQuerySchema } from "@/utils/queryValidation";
 import { io } from "@/socketServer";
+import createMessage from "@/services/sendMessage";
 
 
 const prisma = new PrismaClient();
@@ -123,26 +124,18 @@ export const conversations = async (req: AuthenticatedRequest, res: Response) =>
 
 // Send Message
 export const sendMessage = async (req: AuthenticatedRequest, res: Response) => {
-  const user_id = req.user?.id
+  const user_id = req.user?.id;
+
   const user = await prisma.users.findUnique({
-    where: {
-      id: user_id
-    },
-    select: {
-      id: true,
-      activeProfile: true
-    }
-  })
+    where: { id: user_id },
+    select: { id: true, activeProfile: true }
+  });
 
   if (!user) {
-    res.status(404).json({
-      message: 'User not found.'
-    })
-    return
+    return res.status(404).json({ message: "User not found." });
   }
 
-  const { data, error, success } = sendMessageSchema.safeParse(req.body);
-
+  const { success, data, error } = sendMessageSchema.safeParse(req.body);
   if (!success) {
     return res.status(400).json({
       success: false,
@@ -153,99 +146,24 @@ export const sendMessage = async (req: AuthenticatedRequest, res: Response) => {
     });
   }
 
-  const { content, conversationId, recipientId, recipientRole } = data
-
+  const { content, recipientId } = data;
+  const conversationId = null;
   if (user.id === recipientId) {
     return res.status(400).json({ error: "Cannot send message to yourself" });
   }
 
+  const recipient = await prisma.users.findUnique({
+    where: { id: recipientId },
+    select: { id: true, activeProfile: true }
+  });
+
+  if (!recipient) {
+    return res.status(404).json({ error: "Recipient not found" });
+  }
+
   try {
-    let conversation = null;
-    if (conversationId) {
-      conversation = await prisma.conversation.findUnique({ where: { id: conversationId } });
-      if (!conversation) return res.status(404).json({ error: "Conversation not found" });
-    } else {
-      conversation = await prisma.conversation.findFirst({
-        where: {
-          OR: [
-            {
-              senderId: user.id,
-              recipientId,
-              senderRole: user.activeProfile,
-              recipientRole,
-            },
-            {
-              senderId: recipientId,
-              recipientId: user.id,
-              senderRole: recipientRole,
-              recipientRole: user.activeProfile,
-            },
-          ],
-        },
-      });
 
-      // create if not exists
-      if (!conversation) {
-        try {
-          conversation = await prisma.conversation.create({
-            data: {
-              senderId: user.id,
-              recipientId,
-              senderRole: user.activeProfile,
-              recipientRole,
-            },
-          });
-        } catch (err: any) {
-          if (err?.code === "P2002") {
-            conversation = await prisma.conversation.findFirst({
-              where: {
-                OR: [
-                  {
-                    senderId: user.id,
-                    recipientId,
-                    senderRole: user.activeProfile,
-                    recipientRole,
-                  },
-                  {
-                    senderId: recipientId,
-                    recipientId: user.id,
-                    senderRole: recipientRole,
-                    recipientRole: user.activeProfile,
-                  },
-                ],
-              },
-            });
-          } else {
-            throw err;
-          }
-        }
-      }
-    }
-
-    if (!conversation) return res.status(500).json({ error: "Could not resolve conversation" });
-
-    // 2) Create message
-    const message = await prisma.message.create({
-      data: {
-        conversationId: conversation.id,
-        senderId: user.id,
-        recipientId,
-        senderRole: user.activeProfile,
-        recipientRole,
-        content,
-      },
-      include: {
-        sender: { select: { id: true, name: true, image: true } },
-      },
-    });
-
-    io.to(conversation.id).emit("new-message", message)
-
-    // 3) Bump conversation updatedAt
-    await prisma.conversation.update({
-      where: { id: conversation.id },
-      data: { updatedAt: new Date() },
-    });
+    const message = createMessage({ content, recipientId: recipient.id, user_id })
 
     return res.status(201).json(message);
   } catch (err: any) {

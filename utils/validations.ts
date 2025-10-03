@@ -97,7 +97,6 @@ export const sendMessageSchema = z.object({
   recipientId: z
     .string()
     .min(1, "Recipient ID is required"),
-  recipientRole: RoleEnum,
   content: z.string().min(1, "Content is required.")
 });
 

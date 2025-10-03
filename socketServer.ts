@@ -2,6 +2,7 @@
 import { Server } from "socket.io";
 import { createServer } from "http";
 import app from "./app";
+import createMessage from "./services/sendMessage";
 
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
@@ -17,6 +18,7 @@ const onlineUsers = new Map<string, string>();
 io.on("connection", (socket) => {
   socket.on("join", (userId: string) => {
     onlineUsers.set(userId, socket.id);
+    socket.join(userId)
     io.emit("online-users", Array.from(onlineUsers.keys()));
   });
 
@@ -42,8 +44,9 @@ io.on("connection", (socket) => {
     socket.join(conversationId);
   });
 
-  socket.on("new-message", (message) => {
-    io.to(message.conversationId).emit("new-message", message);
+  socket.on("send-message", async (message) => {
+    await createMessage({ content: message.content, recipientId: message.recipientId, user_id: message.user_id })
+    io.to(message.recipientId).emit("new-message", message);
   });
 });
 
