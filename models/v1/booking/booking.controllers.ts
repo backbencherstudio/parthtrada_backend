@@ -5,7 +5,7 @@ import type { AuthenticatedRequest } from "@/middleware/verifyUsers";
 import moment from 'moment-timezone'
 import { createZoomMeeting } from "@/utils/zoom.utils";
 import { bookingSchema } from "@/utils/validations";
-import { bookingsQuerySchema } from "@/utils/queryValidation";
+import { bookingsQuerySchema, scheduleQuerySchema } from "@/utils/queryValidation";
 import calculateSlotAmount from "@/utils/calculate-slot-amount";
 
 const prisma = new PrismaClient();
@@ -209,11 +209,53 @@ export const index = async (
   }
 };
 
+export const cancelBooking = async (req: AuthenticatedRequest,
+  res: Response): Promise<void> => {
+  try {
+    const booking_id = req.params.id
+    const student_id = req.user?.id
+    const booking = await prisma.booking.findUnique({
+      where: {
+        id: booking_id,
+        studentId: student_id
+      }
+    })
+
+    if (!booking) {
+      res.status(404).json({
+        success: false,
+        message: 'Booking not found.'
+      })
+    }
+
+    const updated_data = await prisma.booking.update({
+      where: {
+        id: booking_id,
+      },
+      data: {
+        status: 'CANCELLED'
+      }
+    })
+
+    res.status(200).json({
+      success: true,
+      message: "Booking cancelled successfully.",
+      data: updated_data
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to cancel booking.",
+      error: "Internal server error.",
+    });
+  }
+}
+
 export const expertIndex = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const expertID = req.user?.id;
 
-    const query = bookingsQuerySchema.safeParse(req.query);
+    const query = scheduleQuerySchema.safeParse(req.query);
 
     if (!query.success) {
       res.status(400).json({
@@ -224,20 +266,25 @@ export const expertIndex = async (req: AuthenticatedRequest, res: Response): Pro
       return
     }
 
-    const { page, perPage, status } = query.data;
+    const { page, perPage } = query.data;
     const skip = (page - 1) * perPage;
 
     const where: Prisma.BookingWhereInput = {
       expertId: expertID,
-      ...(status ? { status } : {}),
     };
 
     const total = await prisma.booking.count({
-      where,
+      where: {
+        ...where,
+        status: 'UPCOMING'
+      },
     });
 
     const bookings = await prisma.booking.findMany({
-      where,
+      where: {
+        ...where,
+        status: 'UPCOMING'
+      },
       skip,
       take: perPage,
       orderBy: { date: "desc" },

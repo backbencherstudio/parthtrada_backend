@@ -206,6 +206,7 @@ enum BookingStatus {
   UPCOMING
   MISSED
   COMPLETED
+  CANCELLED
   REFUNDED
 }
 

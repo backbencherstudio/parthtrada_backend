@@ -165,12 +165,20 @@ export const confirmPayment = async (req: AuthenticatedRequest, res: Response) =
       }
     }
 
-    // Update transaction status
+    // Update transaction and booking status
     const updatedTransaction = await prisma.transaction.update({
       where: { id: transaction.id },
       data: { status: newStatus },
       include: { booking: true }
     });
+    await prisma.booking.update({
+      where: {
+        id: transaction.booking.id
+      },
+      data: {
+        status: 'UPCOMING'
+      }
+    })
 
     res.json({
       success: true,
