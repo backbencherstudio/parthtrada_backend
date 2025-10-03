@@ -183,7 +183,8 @@ export const index = async (
 
     const updatedBookings = bookings.map(booking => ({
       ...booking,
-      should_review: booking.status === "COMPLETED" && !booking.review
+      should_review: booking.status === "COMPLETED" && !booking.review,
+      should_refund: booking.status === 'CANCELLED'
     }));
 
     res.status(200).json({
@@ -233,7 +234,8 @@ export const cancelBooking = async (req: AuthenticatedRequest,
         id: booking_id,
       },
       data: {
-        status: 'CANCELLED'
+        status: 'CANCELLED',
+        refund_reason: 'Cancelled The Meeting'
       }
     })
 

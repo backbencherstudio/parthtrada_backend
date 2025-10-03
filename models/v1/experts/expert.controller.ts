@@ -104,7 +104,7 @@ export const getExpertById = async (req: Request, res: Response) => {
     }
 
     const expert = await prisma.expertProfile.findUnique({
-      where: { id },
+      where: { userId: id },
       include: {
         user: {
           select: {

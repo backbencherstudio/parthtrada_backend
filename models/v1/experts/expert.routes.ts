@@ -17,5 +17,4 @@ router.post("/accept-reject-booking/:id/:action", verifyUser("EXPERT"), acceptRe
 router.post("/create-meeting-link/:bookingId", verifyUser("EXPERT"), createMeetingLink);
 router.post("/complete-session/:id", verifyUser("EXPERT"), markSessionCompleted);
 
-
 export default router;

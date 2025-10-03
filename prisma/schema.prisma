@@ -68,6 +68,7 @@ model Booking {
   sessionDetails  Json
   sessionDuration Int
   status          BookingStatus @default(PENDING)
+  refund_reason   String?
   answer1         String?
   answer2         String?
   answer3         String?

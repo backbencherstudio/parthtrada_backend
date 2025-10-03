@@ -3,9 +3,7 @@ import { PrismaClient } from "@prisma/client";
 import { AuthenticatedRequest } from "@/middleware/verifyUsers";
 import { createConversationSchema, sendMessageSchema } from "@/utils/validations";
 import { paginationQuerySchema } from "@/utils/queryValidation";
-import { io } from "@/socketServer";
 import createMessage from "@/services/sendMessage";
-
 
 const prisma = new PrismaClient();
 
@@ -121,6 +119,67 @@ export const conversations = async (req: AuthenticatedRequest, res: Response) =>
     });
   }
 }
+
+export const getConversationId = async (req: AuthenticatedRequest, res: Response) => {
+  const user_id = req.user?.id;
+
+  const user = await prisma.users.findUnique({
+    where: { id: user_id },
+    select: { id: true, activeProfile: true },
+  });
+
+  if (!user) {
+    return res.status(404).json({ message: "User not found" });
+  }
+
+  const { recipientId } = req.body;
+  if (!recipientId) {
+    return res.status(400).json({ error: "recipientId is required" });
+  }
+
+  if (recipientId === user.id) {
+    return res.status(400).json({ error: "Cannot create conversation with yourself" });
+  }
+
+  const recipient = await prisma.users.findUnique({
+    where: { id: recipientId },
+    select: { id: true, activeProfile: true },
+  });
+
+  if (!recipient) {
+    return res.status(404).json({ error: "Recipient not found" });
+  }
+
+  try {
+    let conversation = await prisma.conversation.findFirst({
+      where: {
+        OR: [
+          { senderId: user.id, recipientId, senderRole: user.activeProfile, recipientRole: recipient.activeProfile },
+          { senderId: recipientId, recipientId: user.id, senderRole: recipient.activeProfile, recipientRole: user.activeProfile },
+        ],
+      },
+    });
+
+    if (!conversation) {
+      conversation = await prisma.conversation.create({
+        data: {
+          senderId: user.id,
+          recipientId,
+          senderRole: user.activeProfile,
+          recipientRole: recipient.activeProfile,
+        },
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      conversationId: conversation.id,
+    });
+  } catch (err: any) {
+    console.error(err);
+    return res.status(500).json({ error: err.message || "Internal error" });
+  }
+};
 
 // Send Message
 export const sendMessage = async (req: AuthenticatedRequest, res: Response) => {
