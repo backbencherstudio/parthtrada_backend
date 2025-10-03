@@ -263,13 +263,14 @@ export const messages = async (req: Request, res: Response) => {
         message: "Invalid query parameters",
         errors: result.error.flatten().fieldErrors,
       });
-      return
+      return;
     }
 
     const { page, perPage } = result.data;
     const skip = (page - 1) * perPage;
 
-    const conversationId = req.params.conversation_id
+    const conversationId = req.params.conversation_id;
+    const userId = (req as any).user?.id;
 
     const messages = await prisma.message.findMany({
       where: { conversationId },
@@ -277,16 +278,24 @@ export const messages = async (req: Request, res: Response) => {
       skip,
       take: perPage,
       include: {
-        sender: { select: { id: true, name: true, image: true } }
+        sender: { select: { id: true, name: true, image: true } },
+        recipient: { select: { id: true, name: true, image: true } }
       }
     });
 
-    const total = await prisma.booking.count();
+    const updatedMessages = messages.map(msg => ({
+      ...msg,
+      me: msg.senderId === userId
+    }));
+
+    const total = await prisma.message.count({
+      where: { conversationId }
+    });
 
     res.status(200).json({
       success: true,
       message: 'Messages fetched successfully.',
-      data: messages,
+      data: updatedMessages,
       pagination: {
         page,
         perPage,
@@ -294,13 +303,14 @@ export const messages = async (req: Request, res: Response) => {
         hasNextPage: page * perPage < total,
         hasPrevPage: page > 1,
       },
-    })
+    });
 
   } catch (error) {
+    console.error(error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch messages.',
       error: 'Something went wrong.'
-    })
+    });
   }
-}
+};

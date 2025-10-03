@@ -209,17 +209,17 @@ export const getExpertReviews = async (req: AuthenticatedRequest, res: Response)
       return res.status(400).json({ success: false, message: "Please provide expert ID." });
     }
 
-    const expertProfile = await prisma.expertProfile.findUnique({ where: { id } });
-    if (!expertProfile) {
-      return res.status(404).json({ success: false, message: "Expert not found." });
-    }
+    // const expertProfile = await prisma.expertProfile.findUnique({ where: { id } });
+    // if (!expertProfile) {
+    //   return res.status(404).json({ success: false, message: "Expert not found." });
+    // }
 
-    const userId = expertProfile.userId;
+    // const userId = expertProfile.userId;
 
     const [totalReviews, reviews] = await Promise.all([
-      prisma.review.count({ where: { expertId: userId } }),
+      prisma.review.count(),
       prisma.review.findMany({
-        where: { expertId: userId },
+        where:{},
         include: {
           student: { select: { name: true, email: true, image: true } },
           booking: { select: { date: true } },

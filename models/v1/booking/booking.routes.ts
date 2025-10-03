@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { 
+import {
   create,
   expertIndex,
   index,
@@ -11,6 +11,7 @@ const router = Router();
 // Student Routes
 router.post("/", verifyUser("STUDENT"), create);
 router.get("/", verifyUser("STUDENT"), index);
+
 
 // Expert Routes
 router.get('/expert', verifyUser('EXPERT'), expertIndex)

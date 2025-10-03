@@ -23,10 +23,17 @@ export const create = async (req: AuthenticatedRequest, res: Response) => {
         const booking = await prisma.booking.findFirst({
             where: {
                 id: data.bookingId
+            },
+            include: {
+                review: {
+                    select: {
+                        id: true
+                    }
+                }
             }
         })
 
-        if (booking.status === 'COMPLETED') {
+        if (booking.status === 'COMPLETED' && !booking.review.id) {
             const review = await prisma.review.create({
                 data: {
                     rating: data.rating,

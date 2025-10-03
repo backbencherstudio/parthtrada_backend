@@ -169,15 +169,27 @@ export const index = async (
 
     const bookings = await prisma.booking.findMany({
       where,
+      include: {
+        review: {
+          select: {
+            id: true
+          }
+        }
+      },
       skip,
       take: perPage,
       orderBy: { date: "desc" },
     });
 
+    const updatedBookings = bookings.map(booking => ({
+      ...booking,
+      should_review: booking.status === "COMPLETED" && !booking.review
+    }));
+
     res.status(200).json({
       success: true,
       message: "Bookings fetched successfully",
-      data: bookings,
+      data: updatedBookings,
       pagination: {
         total,
         page,
@@ -196,7 +208,6 @@ export const index = async (
     });
   }
 };
-
 
 export const expertIndex = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {

@@ -17,7 +17,7 @@ router.post("/experts/payouts", verifyUser("EXPERT"), payouts);
 // Stripe Connect routes
 router.post("/stripe/create-account", verifyUser("EXPERT"), createStripeAccount);
 router.get("/stripe/onboarding-link", verifyUser("ANY"), getOnboardingLink);
-router.get("/stripe/status", verifyUser("ANY"), checkOnboardingStatus);
+router.post("/stripe/status", verifyUser("ANY"), checkOnboardingStatus);
 router.get('/stripe/account/success/:id', updateOnboardStatus)
 
 // Stripe Webhook
