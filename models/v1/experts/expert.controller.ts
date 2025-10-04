@@ -1,5 +1,6 @@
 import type { Request, Response } from "express";
 import { Prisma, PrismaClient } from "@prisma/client";
+import moment from 'moment-timezone'
 import { AuthenticatedRequest } from "@/middleware/verifyUsers";
 import { createZoomMeeting } from "@/utils/zoom.utils";
 import { expertScheduleQuerySchema, expertsQuerySchema } from "@/utils/queryValidation";
@@ -405,21 +406,32 @@ export const acceptRejectBooking = async (req: AuthenticatedRequest, res: Respon
       return;
     }
 
-    let newStatus: "UPCOMING" | "REFUNDED";
+    let newStatus: "UPCOMING" | "CANCELLED";
     let message: string;
+    let meetingLink: string | undefined;
+    let refund_reason: string | undefined
 
     if (action === 'accept') {
+      const zoomMeeting = await createZoomMeeting({
+        topic: `Session with ${booking.student.name ?? 'Student'}`,
+        startTime: booking.expertDateTime,
+        duration: booking.sessionDuration,
+        agenda: JSON.stringify(booking.sessionDetails),
+        timezone: booking.expert.timezone,
+      });
+      meetingLink = zoomMeeting.join_url;
       newStatus = "UPCOMING";
       message = "Booking accepted successfully";
     } else {
-      newStatus = "REFUNDED"; // Using REFUNDED status for cancelled bookings
+      newStatus = "CANCELLED";
+      refund_reason = "Cancelled The Meeting"
       message = "Booking rejected successfully";
     }
 
     // Update the booking status
-    const updatedBooking = await prisma.booking.update({
+    await prisma.booking.update({
       where: { id: id },
-      data: { status: newStatus },
+      data: { status: newStatus, refund_reason: refund_reason ?? null, meetingLink },
     });
 
     // todo: send notification to the student that the booking is accepted and wait for the meeting link from the expert

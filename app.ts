@@ -62,21 +62,7 @@ app.use("/ai", aiRoutes);
 app.set("view engine", "ejs");
 app.set("views", path.join(__dirname, "views"));
 
-app.get("/add-card", async (req, res) => {
-  try {
-    const intent = await setupIntent()
-
-    res.render("index", {
-      publishableKey: 'pk_test_51S39GcLenvrEQJkbVfvGzHLbGEVeTgpoJFGv6ZMw5vvai6r2HQrusGhuSRaBASSDlUc9Y1R293qKduPfhqPKwtEw00PRFjI7Xa',
-      clientSecret: intent.clientSecret,
-      customerId: intent.customerId
-    });
-  } catch (err) {
-    console.error(err);
-    res.status(500).send("Failed to create SetupIntent");
-  }
-});
-
+// For dev
 app.get("/chat-abc", async (req, res) => {
   try {
     res.render("chat");
