@@ -219,7 +219,7 @@ export const getExpertReviews = async (req: AuthenticatedRequest, res: Response)
     const [totalReviews, reviews] = await Promise.all([
       prisma.review.count(),
       prisma.review.findMany({
-        where:{},
+        where: {},
         include: {
           student: { select: { name: true, email: true, image: true } },
           booking: { select: { date: true } },
@@ -340,7 +340,10 @@ export const getReviews = async (req: AuthenticatedRequest, res: Response) => {
 
 export const acceptRejectBooking = async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { id, action } = req.params; // action will be 'accept' or 'reject'
+    const { id, action } = req.params;
+    if (!["accept", "reject"].includes(action)) {
+      return res.status(400).json({ message: "Invalid action" });
+    }
     const expertId = req.user?.id;
 
     if (!id || !action) {

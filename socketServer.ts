@@ -45,9 +45,6 @@ io.on("connection", (socket) => {
   });
 
   socket.on("send-message", async (message) => {
-    console.log('============new message========================');
-    console.log(message);
-    console.log('====================================');
     await createMessage({ content: message.content, recipientId: message.recipientId, user_id: message.user_id })
     io.to(message.recipientId).emit("new-message", message);
   });

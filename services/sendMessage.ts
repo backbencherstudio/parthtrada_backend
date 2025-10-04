@@ -24,7 +24,10 @@ export default async function createMessage({ content, recipientId, user_id }: {
     });
 
     if (!recipient) {
-        throw new Error('Recipient not found.')
+        return {
+            success: false,
+            message: 'recipientId is required.'
+        }
     }
 
     try {
@@ -33,7 +36,10 @@ export default async function createMessage({ content, recipientId, user_id }: {
         if (conversationId) {
             conversation = await prisma.conversation.findUnique({ where: { id: conversationId } });
             if (!conversation) {
-                throw new Error('Conversation not found.',)
+                return {
+                    success: false,
+                    message: 'Conversation not found.'
+                }
             }
         } else {
             conversation = await prisma.conversation.findFirst({
@@ -91,6 +97,9 @@ export default async function createMessage({ content, recipientId, user_id }: {
 
         return message
     } catch (err: any) {
-        throw new Error('Internal server error.')
+        return {
+            success: false,
+            message: 'Internal server error.'
+        }
     }
 }
