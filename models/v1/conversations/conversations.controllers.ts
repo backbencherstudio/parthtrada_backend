@@ -94,24 +94,38 @@ export const conversations = async (req: AuthenticatedRequest, res: Response) =>
               { recipientId: user_id, recipientRole: user.activeProfile },
             ],
           },
-          {
-            messages: { some: {} }
-          }
-        ]
+          { messages: { some: {} } },
+        ],
       },
       include: {
         sender: { select: { id: true, name: true, image: true } },
         recipient: { select: { id: true, name: true, image: true } },
-        messages: { orderBy: { createdAt: "desc" }, take: 1 }
+        messages: { orderBy: { createdAt: "desc" }, take: 1 },
       },
       orderBy: { updatedAt: "desc" },
     });
 
+    const normalized = conversations.map(conv => {
+      const participant =
+        conv.senderId === user_id && conv.senderRole === user.activeProfile
+          ? conv.recipient
+          : conv.sender;
+
+      return {
+        id: conv.id,
+        recipientId: participant.id,
+        messages: [conv.messages[0] || null],
+        sender: participant,
+        updatedAt: conv.updatedAt,
+      };
+    });
+
     res.status(200).json({
       success: true,
-      message: 'Conversations fetched successfully.',
-      data: conversations,
-    })
+      message: "Conversations fetched successfully.",
+      data: normalized,
+    });
+
   } catch (error) {
     res.status(500).json({
       success: false,
