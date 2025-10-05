@@ -15,6 +15,7 @@ import reviewRoutes from "./models/v1/reviews/reviews.routes";
 import conversationsRoutes from "./models/v1/conversations/conversations.routes";
 import aiRoutes from "./models/v1/ai-assistant/ai.routes";
 import s_webhookRoutes from './models/v1/stripe/webhook/webhook.routes'
+import notificationsRoutes from './models/v1/notifications/notifications.routes'
 
 const app = express();
 
@@ -52,6 +53,7 @@ app.use("/experts", expertRoutes);
 app.use("/payments", paymentRoutes);
 app.use("/reviews", reviewRoutes);
 app.use("/conversations", conversationsRoutes);
+app.use("/notifications", notificationsRoutes);
 app.use("/ai", aiRoutes);
 
 // For testing add ejs

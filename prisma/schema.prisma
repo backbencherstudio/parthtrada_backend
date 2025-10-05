@@ -129,35 +129,14 @@ model Notification {
   type        NotificationType
   isRead      Boolean          @default(false)
   image       String?
+  meta        Json
   recipientId String
-  createdAt   DateTime         @default(now())
-  recipient   Users            @relation(fields: [recipientId], references: [id], onDelete: Cascade)
+  sender_id   String
+  recipient   Users            @relation("UserReceivedNotifications", fields: [recipientId], references: [id], onDelete: Cascade)
+  sender      Users            @relation("UserSentNotifications", fields: [sender_id], references: [id], onDelete: Cascade)
+  created_at  DateTime         @default(now())
+  updated_at  DateTime         @updatedAt
 }
-
-// model ChatRoom {
-//   id        String          @id @default(cuid())
-//   studentId String?
-//   expertId  String?
-//   createdAt DateTime        @default(now())
-//   updatedAt DateTime        @updatedAt
-//   expert    ExpertProfile?  @relation("ExpertProfileToChatRoom", fields: [expertId], references: [id])
-//   student   StudentProfile? @relation("StudentProfileToChatRoom", fields: [studentId], references: [id])
-//   messages  Message[]
-
-//   @@unique([studentId, expertId])
-// }
-
-// model Message {
-//   id         String   @id @default(cuid())
-//   content    String
-//   senderType Role
-//   senderId   String
-//   chatRoomId String
-//   isRead     Boolean  @default(false)
-//   isAI       Boolean  @default(false)
-//   createdAt  DateTime @default(now())
-//   chatRoom   ChatRoom @relation(fields: [chatRoomId], references: [id], onDelete: Cascade)
-// }
 
 model PaymentMethod {
   id        String  @id @default(cuid())
@@ -187,7 +166,6 @@ model Users {
   expertBookings        Booking[]       @relation("ExpertBookings")
   studentBookings       Booking[]       @relation("StudentBookings")
   expertProfile         ExpertProfile?
-  notifications         Notification[]
   customer_id           String?
   payment_methods       PaymentMethod[]
   expertReviews         Review[]        @relation("ExpertReview")
@@ -200,6 +178,8 @@ model Users {
   receivedConversations Conversation[]  @relation("ReceivedConversations")
   sentMessages          Message[]       @relation("SentMessages")
   receivedMessages      Message[]       @relation("ReceivedMessages")
+  sentNotifications     Notification[]  @relation("UserSentNotifications")
+  receivedNotifications Notification[]  @relation("UserReceivedNotifications")
 }
 
 enum BookingStatus {

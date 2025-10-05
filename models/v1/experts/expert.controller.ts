@@ -397,8 +397,7 @@ export const acceptRejectBooking = async (req: AuthenticatedRequest, res: Respon
       return;
     }
 
-    //@ts-ignore
-    if (booking.status !== "PENDING" || booking.meetingLink) { //@ts-ignore
+    if (booking.status !== "PENDING" || booking.meetingLink) {
       res.status(400).json({
         success: false,
         message: `This booking has already been processed`,
@@ -417,7 +416,7 @@ export const acceptRejectBooking = async (req: AuthenticatedRequest, res: Respon
         startTime: booking.expertDateTime,
         duration: booking.sessionDuration,
         agenda: JSON.stringify(booking.sessionDetails),
-        timezone: booking.expert.timezone,
+        timezone: booking?.expert?.timezone || "UTC",
       });
       meetingLink = zoomMeeting.join_url;
       newStatus = "UPCOMING";
@@ -435,6 +434,16 @@ export const acceptRejectBooking = async (req: AuthenticatedRequest, res: Respon
     });
 
     // todo: send notification to the student that the booking is accepted and wait for the meeting link from the expert
+    // Send notification
+    // await prisma.notification.create({
+    //   data: {
+    //     title: '',
+    //     message: '',
+    //     type: 'BOOKING_REQUESTED',
+    //     recipientId: expertId,
+    //     sender_id: 
+    //   }
+    // })
 
     res.status(200).json({
       success: true,

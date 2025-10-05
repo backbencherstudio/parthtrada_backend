@@ -86,6 +86,9 @@ export const create = async (req: AuthenticatedRequest, res: Response) => {
         sessionDuration: data.sessionDuration,
         sessionDetails: data.sessionDetails,
       },
+      include: {
+        student: true
+      }
     });
 
     const amount = calculateSlotAmount(expert.hourlyRate, data.sessionDuration)
@@ -119,6 +122,20 @@ export const create = async (req: AuthenticatedRequest, res: Response) => {
         status: "PENDING",
       },
     });
+
+    await prisma.notification.create({
+      data: {
+        image: booking.student.image,
+        title: booking.student.name,
+        message: `Wants to take your consultation on the ${expertMoment.toDate()}`,
+        type: 'BOOKING_REQUESTED',
+        sender_id: booking.studentId,
+        recipientId: booking.expertId,
+        meta: {
+          booking_id: booking.id
+        }
+      }
+    })
 
     return res.json({
       success: true,

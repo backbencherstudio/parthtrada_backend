@@ -1,7 +1,7 @@
 import { Response } from "express";
 import { PrismaClient } from "@prisma/client";
 import { AuthenticatedRequest } from "@/middleware/verifyUsers";
-import { cardSchema, confirmPaymentSchema, payoutsSchema, refundTransactionSchema, savePaymentMethodSchema } from "@/utils/validations";
+import { cardSchema, confirmPaymentSchema, payoutsSchema, refundTransactionSchema } from "@/utils/validations";
 import stripe from "@/services/stripe";
 import { paginationQuerySchema } from "@/utils/queryValidation";
 
@@ -261,10 +261,51 @@ export const transactions = async (req: AuthenticatedRequest, res: Response) => 
         orderBy: { date: "desc" },
       })
 
-      transactions = raw_transactions.map(item => ({ expert_name: item.expert.name, status: item.status, refund_reason: item.refund_reason, ...item.transaction }))
+      transactions = raw_transactions.map(item => ({ name: item.expert.name, status: item.status, refund_reason: item.refund_reason, ...item.transaction }))
+    } else {
+      total = await prisma.booking.count({
+        where: {
+          expertId: user_id,
+          transaction: {
+            status: { in: ['COMPLETED', 'REFUNDED'] }
+          }
+        }
+      });
+      const raw_transactions = await prisma.booking.findMany({
+        where: {
+          expertId: user_id,
+          transaction: {
+            status: { in: ['COMPLETED', 'REFUNDED'] }
+          }
+        },
+        select: {
+          refund_reason: true,
+          student: {
+            select: {
+              name: true
+            }
+          },
+          transaction: {
+            where: {
+              status: { in: ['COMPLETED', 'REFUNDED'] }
+            },
+            select: {
+              id: true,
+              status: true,
+              amount: true,
+              createdAt: true
+            }
+          }
+        },
+        skip,
+        take: perPage,
+        orderBy: { date: "desc" },
+      })
+
+      transactions = raw_transactions.map(item => ({ name: item.student.name, refund_reason: item.refund_reason, ...item.transaction }))
     }
 
-    return res.status(201).json({
+    return res.status(200).json({
       success: true,
       message: 'Transactions fetched successfully.',
       data: transactions,
