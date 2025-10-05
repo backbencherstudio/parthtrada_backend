@@ -39,10 +39,11 @@ export const index = async (req: AuthenticatedRequest, res: Response) => {
     })
 
     const results = notifications.map(notification => {
+      let booking_id: string | undefined
       switch (notification.type) {
         case 'BOOKING_REQUESTED':
           // @ts-ignore
-          const booking_id = notification.meta?.booking_id as string
+          booking_id = notification.meta?.booking_id as string
           return {
             img: notification.image,
             title: notification.title,
@@ -51,12 +52,39 @@ export const index = async (req: AuthenticatedRequest, res: Response) => {
               {
                 bg_primary: false,
                 text: 'Decline',
-                url: `/experts/bookings/actions/${booking_id}/reject`
+                url: `/experts/bookings/actions/${booking_id}/reject`,
+                req_method: 'PATCH'
               },
               {
                 bg_primary: true,
                 text: 'Accept',
-                url: `/experts/bookings/actions/${booking_id}/accept`
+                url: `/experts/bookings/actions/${booking_id}/accept`,
+                req_method: 'PATCH'
+              }
+            ]
+          }
+        case 'BOOKING_CONFIRMED':
+            // @ts-ignore
+            booking_id = notification.meta?.booking_id as string
+          return {
+            img: notification.image,
+            title: notification.title,
+            description: notification.message,
+            actions: []
+          }
+        case 'BOOKING_CANCELLED_BY_EXPERT':
+            // @ts-ignore
+            booking_id = notification.meta?.booking_id as string
+          return {
+            img: notification.image,
+            title: notification.title,
+            description: notification.message,
+            actions: [
+              {
+                bg_primary: true,
+                text: 'Refund',
+                url: `refund_req`,
+                req_method: 'POST'
               }
             ]
           }
@@ -75,6 +103,7 @@ export const index = async (req: AuthenticatedRequest, res: Response) => {
       message: 'Notifications fetched successfully.',
       data: results,
       pagination: {
+        total,
         page,
         perPage,
         totalPages: Math.ceil(total / perPage),
@@ -86,7 +115,7 @@ export const index = async (req: AuthenticatedRequest, res: Response) => {
     console.error('Failed to fetch notification', error?.message)
     res.status(500).json({
       success: false,
-      message: 'Failed to fetch messages.',
+      message: 'Failed to fetch notifications.',
       error: 'Something went wrong.'
     })
   }

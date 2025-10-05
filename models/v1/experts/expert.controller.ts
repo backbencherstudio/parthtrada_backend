@@ -421,7 +421,29 @@ export const acceptRejectBooking = async (req: AuthenticatedRequest, res: Respon
       meetingLink = zoomMeeting.join_url;
       newStatus = "UPCOMING";
       message = "Booking accepted successfully";
+      await prisma.notification.create({
+        data: {
+          type: 'BOOKING_CONFIRMED',
+          image: booking.expert.image,
+          title: booking.expert.name,
+          message: `Accept your consultation request on ${booking.studentDateTime}`,
+          sender_id: booking.expert.id,
+          recipientId: booking.student.id,
+          meta: { booking_id: booking.id },
+        }
+      })
     } else {
+      await prisma.notification.create({
+        data: {
+          type: 'BOOKING_CANCELLED_BY_EXPERT',
+          image: booking.expert.image,
+          title: booking.expert.name,
+          message: `Reject your consultation request on ${booking.studentDateTime}`,
+          sender_id: booking.expert.id,
+          recipientId: booking.student.id,
+          meta: { booking_id: booking.id },
+        }
+      })
       newStatus = "CANCELLED";
       refund_reason = "Cancelled The Meeting"
       message = "Booking rejected successfully";
