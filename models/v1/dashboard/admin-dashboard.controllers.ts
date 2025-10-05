@@ -3,17 +3,14 @@ import { PrismaClient } from "@prisma/client";
 import { dashboardExpertsQuerySchema, sessionsQuerySchema, transactionsQuerySchema, usersQuerySchema } from "@/utils/queryValidation";
 import { AuthenticatedRequest } from "@/middleware/verifyUsers";
 import { adminProfileSchema, changeExpertStatus } from "@/utils/validations";
+import getDashboardStats from "@/utils/getDashboardStats";
 
 const prisma = new PrismaClient();
 
 export const dashboard = async (req: Request, res: Response): Promise<void> => {
   try {
-    const [totalUsers, studentCount, expertCount, totalSessions,] = await Promise.all([
-      prisma.users.count(),
-      prisma.users.count({ where: { activeProfile: "STUDENT" } }),
-      prisma.users.count({ where: { activeProfile: "EXPERT" } }),
-      prisma.booking.count(),
-    ]);
+
+    const { expertCount, studentCount, summary, totalUsers } = await getDashboardStats()
 
     // percentage calculation
     const studentPercent = totalUsers ? Math.round((studentCount / totalUsers) * 100) : 0;
@@ -116,12 +113,7 @@ export const dashboard = async (req: Request, res: Response): Promise<void> => {
     res.json({
       success: true,
       data: {
-        totals: {
-          totalUsers,
-          totalExperts: expertCount,
-          totalSessions,
-          // totalTransactions: txAgg._sum.amount ?? 0,
-        },
+        totals: summary,
         userRole: {
           students: { count: studentCount, percent: studentPercent },
           experts: { count: expertCount, percent: expertPercent },
