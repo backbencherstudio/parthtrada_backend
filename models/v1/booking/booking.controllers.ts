@@ -346,7 +346,7 @@ export const bookingRequest = async (req: AuthenticatedRequest, res: Response) =
 
     const where: any = {
       studentId: user_id,
-      status: 'COMPLETED'
+      status: 'PENDING'
     }
 
     const [data, total] = await Promise.all([
@@ -356,13 +356,14 @@ export const bookingRequest = async (req: AuthenticatedRequest, res: Response) =
           expert: {
             select: {
               name: true,
+              image: true,
+              expertProfile: {
+                select: {
+                  description: true
+                }
+              }
             }
           },
-          transaction: {
-            select: {
-              amount: true
-            }
-          }
         },
         skip,
         take: perPage,
@@ -374,9 +375,10 @@ export const bookingRequest = async (req: AuthenticatedRequest, res: Response) =
     const filteredData = data.map(item => ({
       id: item.id,
       name: item.expert.name,
+      image: item.expert.image,
+      description: item.expert.expertProfile.description,
       duration: item.sessionDuration,
       date: item.date,
-      amount: item.transaction.amount,
     }));
 
 
@@ -427,14 +429,14 @@ export const expertIndex = async (req: AuthenticatedRequest, res: Response): Pro
     const total = await prisma.booking.count({
       where: {
         ...where,
-        status: 'UPCOMING'
+        status: { in: ['PENDING', 'UPCOMING'] }
       },
     });
 
     const bookings = await prisma.booking.findMany({
       where: {
         ...where,
-        status: 'UPCOMING',
+        status: { in: ['PENDING', 'UPCOMING'] },
       },
       skip,
       take: perPage,
@@ -551,18 +553,3 @@ export const capturePayment = async (req: AuthenticatedRequest, res: Response) =
   }
 };
 
-export const setupIntent = async () => {
-
-  const customer = await stripe.customers.create({
-    email: "alice@example.com",
-    phone: '01712345679',
-    name: "Alice Doe",
-  });
-
-  const setupIntent = await stripe.setupIntents.create({
-    customer: customer.id,
-    automatic_payment_methods: { enabled: true, allow_redirects: 'never' },
-  });
-
-  return { clientSecret: setupIntent.client_secret, customerId: customer.id }
-}

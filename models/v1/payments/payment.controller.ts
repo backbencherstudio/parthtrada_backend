@@ -187,6 +187,38 @@ export const confirmPayment = async (req: AuthenticatedRequest, res: Response) =
   }
 };
 
+export const transactions =  async(req: AuthenticatedRequest, res: Response) =>{
+  try {
+    const user_id = req.user?.id
+
+    const user = await prisma.users.findUnique({
+      where: {
+        id: user_id
+      }
+    })
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found.'
+      })
+    }
+
+    const user_type = user.activeProfile;
+    let transactions;
+
+    if (user_type === 'STUDENT') {
+      transactions = await prisma.transaction.findMany({
+        where: {
+          
+        }
+      })
+    }
+
+  } catch (error) {
+    
+  }
+}
 
 export const refundTransaction = async (req: AuthenticatedRequest, res: Response) => {
   try {

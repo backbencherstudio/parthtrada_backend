@@ -33,7 +33,7 @@ export const create = async (req: AuthenticatedRequest, res: Response) => {
             }
         })
 
-        if (booking.status === 'COMPLETED' && !booking.review.id) {
+        if (booking.status === 'COMPLETED' && !booking?.review?.id) {
             const review = await prisma.review.create({
                 data: {
                     rating: data.rating,

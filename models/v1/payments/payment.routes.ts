@@ -5,9 +5,11 @@ import { checkOnboardingStatus, createStripeAccount, getOnboardingLink, updateOn
 
 const router = Router()
 
+// Student routes
 router.post('/add-card', verifyUser("ANY"), createCard)
 router.get('/cards', verifyUser('ANY'), getCards)
 router.post("/confirm-payment", verifyUser("ANY"), confirmPayment);
+router.get("/student/transactions", verifyUser("ANY"), confirmPayment);
 
 // expert routes
 router.post("/experts/refund", verifyUser("EXPERT"), refundTransaction);
