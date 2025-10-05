@@ -1,8 +1,9 @@
-import { Request, Response } from "express";
+import { Response } from "express";
 import { PrismaClient } from "@prisma/client";
 import { AuthenticatedRequest } from "@/middleware/verifyUsers";
 import { cardSchema, confirmPaymentSchema, payoutsSchema, refundTransactionSchema, savePaymentMethodSchema } from "@/utils/validations";
 import stripe from "@/services/stripe";
+import { paginationQuerySchema } from "@/utils/queryValidation";
 
 const prisma = new PrismaClient();
 
@@ -187,9 +188,22 @@ export const confirmPayment = async (req: AuthenticatedRequest, res: Response) =
   }
 };
 
-export const transactions =  async(req: AuthenticatedRequest, res: Response) =>{
+export const transactions = async (req: AuthenticatedRequest, res: Response) => {
   try {
+    const query = paginationQuerySchema.safeParse(req.query);
     const user_id = req.user?.id
+
+    if (!query.success) {
+      res.status(400).json({
+        success: false,
+        message: "Invalid pagination parameters",
+        errors: query.error.flatten().fieldErrors,
+      });
+      return
+    }
+
+    const { page, perPage } = query.data;
+    const skip = (page - 1) * perPage;
 
     const user = await prisma.users.findUnique({
       where: {
@@ -205,18 +219,70 @@ export const transactions =  async(req: AuthenticatedRequest, res: Response) =>{
     }
 
     const user_type = user.activeProfile;
-    let transactions;
+    let transactions = [];
+    let total = 0;
 
     if (user_type === 'STUDENT') {
-      transactions = await prisma.transaction.findMany({
+      total = await prisma.booking.count({
         where: {
-          
+          studentId: user_id, transaction: {
+            status: { in: ['COMPLETED', 'REFUNDED'] }
+          }
         }
+      });
+      const raw_transactions = await prisma.booking.findMany({
+        where: {
+          studentId: user_id,
+          status: {
+            notIn: ['PENDING']
+          }
+        },
+        select: {
+          status: true,
+          refund_reason: true,
+          expert: {
+            select: {
+              name: true
+            }
+          },
+          transaction: {
+            where: {
+              status: { in: ['COMPLETED', 'REFUNDED'] }
+            },
+            select: {
+              id: true,
+              amount: true,
+              createdAt: true
+            }
+          }
+        },
+        skip,
+        take: perPage,
+        orderBy: { date: "desc" },
       })
+
+      transactions = raw_transactions.map(item => ({ expert_name: item.expert.name, status: item.status, refund_reason: item.refund_reason, ...item.transaction }))
     }
 
+    return res.status(201).json({
+      success: true,
+      message: 'Transactions fetched successfully.',
+      data: transactions,
+      pagination: {
+        total,
+        page,
+        perPage,
+        totalPages: Math.ceil(total / perPage),
+        hasNextPage: page * perPage < total,
+        hasPrevPage: page > 1,
+      },
+    })
   } catch (error) {
-    
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch transactions",
+      error: "Internal server error",
+    });
   }
 }
 
@@ -284,11 +350,10 @@ export const refundTransaction = async (req: AuthenticatedRequest, res: Response
     res.status(500).json({
       success: false,
       message: "Failed to initiate refund",
-      error: error instanceof Error ? error.message : "Internal server error",
+      error: "Internal server error",
     });
   }
 };
-
 
 export const payouts = async (req: AuthenticatedRequest, res: Response) => {
   const { data, error, success } = payoutsSchema.safeParse(req.body);
