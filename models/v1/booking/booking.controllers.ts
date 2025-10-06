@@ -3,7 +3,6 @@ import { Prisma, PrismaClient } from "@prisma/client";
 import Stripe from "stripe";
 import type { AuthenticatedRequest } from "@/middleware/verifyUsers";
 import moment from 'moment-timezone'
-import { createZoomMeeting } from "@/utils/zoom.utils";
 import { bookingSchema } from "@/utils/validations";
 import { bookingsQuerySchema, paginationQuerySchema, scheduleQuerySchema } from "@/utils/queryValidation";
 import calculateSlotAmount from "@/utils/calculate-slot-amount";
@@ -48,41 +47,15 @@ export const create = async (req: AuthenticatedRequest, res: Response) => {
       where: { id: userId },
     });
 
-    const expertDateTime = `${data.date} ${data.time}`;
-
-    const expertTimeZone = expert?.user?.timezone || "UTC";
-    const studentTimeZone = student?.timezone || "UTC";
-
-    const expertMoment = moment.tz(expertDateTime, "YYYY-MM-DD hh:mm a", expertTimeZone);
-
-    const studentMoment = expertMoment.clone().tz(studentTimeZone);
-
-    let meetingLink: string | undefined;
-    try {
-      const zoomMeeting = await createZoomMeeting({
-        topic: `Session with ${student?.name ?? 'Student'}`,
-        startTime: expertMoment.toDate(),
-        duration: data.sessionDuration,
-        agenda: data.sessionDetails,
-        timezone: expertTimeZone,
-      });
-      meetingLink = zoomMeeting.join_url;
-    } catch (zoomErr) {
-      console.error('Failed to create Zoom meeting', zoomErr);
-      res.status(500).json({
-        success: false,
-        message: 'Failed to create Zoom meeting',
-      });
-      return;
-    }
+    const timezone = student.timezone
+    const localDateTime = moment.tz(`${data.date} ${data.time}`, "YYYY-MM-DD HH:mm", timezone);
+    const utcDateTime = localDateTime.clone().utc().toDate()
 
     const booking = await prisma.booking.create({
       data: {
         studentId: userId,
         expertId: data.expertId,
-        date: expertMoment.toDate(),
-        expertDateTime: expertMoment.toDate(),
-        studentDateTime: studentMoment.toDate(),
+        date: utcDateTime,
         sessionDuration: data.sessionDuration,
         sessionDetails: data.sessionDetails,
       },
@@ -123,19 +96,19 @@ export const create = async (req: AuthenticatedRequest, res: Response) => {
       },
     });
 
-    await prisma.notification.create({
-      data: {
-        image: booking.student.image,
-        title: booking.student.name,
-        message: `Wants to take your consultation on the ${expertMoment.toDate()}`,
-        type: 'BOOKING_REQUESTED',
-        sender_id: booking.studentId,
-        recipientId: booking.expertId,
-        meta: {
-          booking_id: booking.id
-        }
-      }
-    })
+    // await prisma.notification.create({
+    //   data: {
+    //     image: booking.student.image,
+    //     title: booking.student.name,
+    //     message: `Wants to take your consultation on the ${expertMoment.toDate()}`,
+    //     type: 'BOOKING_REQUESTED',
+    //     sender_id: booking.studentId,
+    //     recipientId: booking.expertId,
+    //     meta: {
+    //       booking_id: booking.id
+    //     }
+    //   }
+    // })
 
     return res.json({
       success: true,
@@ -363,7 +336,10 @@ export const bookingRequest = async (req: AuthenticatedRequest, res: Response) =
 
     const where: any = {
       studentId: user_id,
-      status: 'PENDING'
+      status: 'PENDING',
+      transaction: {
+        status: 'COMPLETED'
+      }
     }
 
     const [data, total] = await Promise.all([
@@ -401,7 +377,7 @@ export const bookingRequest = async (req: AuthenticatedRequest, res: Response) =
 
     res.status(200).json({
       success: true,
-      message: "Past call fetched successfully",
+      message: "Booking request fetched successfully",
       data: filteredData,
       pagination: {
         total,

@@ -410,6 +410,9 @@ export const acceptRejectBooking = async (req: AuthenticatedRequest, res: Respon
     let meetingLink: string | undefined;
     let refund_reason: string | undefined
 
+    const studentTimezone = booking.student.timezone;
+    const studentLocalTime = moment.utc(booking.date).tz(studentTimezone)
+
     if (action === 'accept') {
       const zoomMeeting = await createZoomMeeting({
         topic: `Session with ${booking.student.name ?? 'Student'}`,
@@ -426,7 +429,7 @@ export const acceptRejectBooking = async (req: AuthenticatedRequest, res: Respon
           type: 'BOOKING_CONFIRMED',
           image: booking.expert.image,
           title: booking.expert.name,
-          message: `Accept your consultation request on ${booking.studentDateTime}`,
+          message: `Accept your consultation request on ${studentLocalTime}`,
           sender_id: booking.expert.id,
           recipientId: booking.student.id,
           meta: { booking_id: booking.id },
@@ -438,7 +441,7 @@ export const acceptRejectBooking = async (req: AuthenticatedRequest, res: Respon
           type: 'BOOKING_CANCELLED_BY_EXPERT',
           image: booking.expert.image,
           title: booking.expert.name,
-          message: `Reject your consultation request on ${booking.studentDateTime}`,
+          message: `Reject your consultation request on ${studentLocalTime}`,
           sender_id: booking.expert.id,
           recipientId: booking.student.id,
           meta: { booking_id: booking.id },
@@ -454,18 +457,6 @@ export const acceptRejectBooking = async (req: AuthenticatedRequest, res: Respon
       where: { id: id },
       data: { status: newStatus, refund_reason: refund_reason ?? null, meetingLink },
     });
-
-    // todo: send notification to the student that the booking is accepted and wait for the meeting link from the expert
-    // Send notification
-    // await prisma.notification.create({
-    //   data: {
-    //     title: '',
-    //     message: '',
-    //     type: 'BOOKING_REQUESTED',
-    //     recipientId: expertId,
-    //     sender_id: 
-    //   }
-    // })
 
     res.status(200).json({
       success: true,

@@ -62,8 +62,8 @@ model Booking {
   studentId       String?
   expertId        String?
   date            DateTime
-  expertDateTime  DateTime
-  studentDateTime DateTime
+  expertDateTime  DateTime?
+  studentDateTime DateTime?
   meetingLink     String?
   sessionDetails  Json
   sessionDuration Int
@@ -160,7 +160,7 @@ model Users {
   lastLogin             DateTime?
   image                 String?
   activeProfile         Role            @default(STUDENT)
-  timezone              String?
+  timezone              String          @default("UTC")
   createdAt             DateTime        @default(now())
   updatedAt             DateTime        @updatedAt
   expertBookings        Booking[]       @relation("ExpertBookings")

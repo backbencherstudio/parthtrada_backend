@@ -1,5 +1,6 @@
 import { Response } from "express";
 import { PrismaClient } from "@prisma/client";
+import moment from 'moment-timezone';
 import { AuthenticatedRequest } from "@/middleware/verifyUsers";
 import { cardSchema, confirmPaymentSchema, payoutsSchema, refundTransactionSchema } from "@/utils/validations";
 import stripe from "@/services/stripe";
@@ -92,16 +93,15 @@ export const getCards = async (req: AuthenticatedRequest, res: Response) => {
 export const confirmPayment = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { data, error, success } = confirmPaymentSchema.safeParse(req.body);
+
     if (!success) {
-      if (!success) {
-        return res.status(400).json({
-          success: false,
-          errors: JSON.parse(error.message).map(err => ({
-            field: err.path.join("."),
-            message: err.message,
-          })),
-        });
-      }
+      return res.status(400).json({
+        success: false,
+        errors: JSON.parse(error.message).map(err => ({
+          field: err.path.join("."),
+          message: err.message,
+        })),
+      });
     }
 
     const userId = req.user?.id;
@@ -118,7 +118,12 @@ export const confirmPayment = async (req: AuthenticatedRequest, res: Response) =
         }
       },
       include: {
-        booking: true
+        booking: {
+          include: {
+            expert: true,
+            student: true
+          }
+        }
       }
     });
 
@@ -158,6 +163,23 @@ export const confirmPayment = async (req: AuthenticatedRequest, res: Response) =
         if (updatedIntent.status === "requires_capture") {
           await stripe.paymentIntents.capture(data.paymentIntentId);
           newStatus = "COMPLETED";
+
+          const expertTimezone = transaction.booking.expert.timezone;
+          const expertLocalTime = moment.utc(transaction.booking.date).tz(expertTimezone)
+
+          await prisma.notification.create({
+            data: {
+              image: transaction.booking.student.image,
+              title: transaction.booking.student.name,
+              message: `Wants to take your consultation on the ${expertLocalTime}`,
+              type: 'BOOKING_REQUESTED',
+              sender_id: transaction.booking.studentId,
+              recipientId: transaction.booking.expertId,
+              meta: {
+                booking_id: transaction.booking.id
+              }
+            }
+          })
         } else {
           throw new Error(`PaymentIntent not ready to capture. Status: ${updatedIntent.status}`);
         }

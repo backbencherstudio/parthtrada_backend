@@ -1,3 +1,4 @@
+import moment from "moment-timezone";
 import { z } from "zod";
 
 export const RoleEnum = z.enum(["ADMIN", "EXPERT", "STUDENT"]);
@@ -100,9 +101,15 @@ export const sendMessageSchema = z.object({
   content: z.string().min(1, "Content is required.")
 });
 
-
+const validTimezones = moment.tz.names();
 export const profileSchema = z.object({
-  hourlyRate: z.number().optional()
+  hourlyRate: z.number().optional(),
+  timezone: z
+    .string("Timezone must be a string")
+    .refine((tz) => validTimezones.includes(tz), {
+      message: "Invalid timezone",
+    })
+    .optional()
 })
 export const cardSchema = z.object({
   token: z.string(),
