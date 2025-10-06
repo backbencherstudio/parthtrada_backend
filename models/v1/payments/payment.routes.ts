@@ -1,5 +1,5 @@
 import express, { Router } from 'express';
-import { balance, confirmPayment, createCard, getCards, payouts, refundTransaction, transactions } from './payment.controller';
+import { balance, confirmPayment, createCard, defaultCard, getCards, payouts, refundTransaction, transactions } from './payment.controller';
 import { verifyUser } from '@/middleware/verifyUsers';
 import { checkOnboardingStatus, createStripeAccount, getOnboardingLink, updateOnboardStatus, webhook } from './stripe.controllers';
 
@@ -10,6 +10,7 @@ router.get("/transactions", verifyUser("ANY"), transactions);
 
 // Student routes
 router.post('/add-card', verifyUser("ANY"), createCard)
+router.patch('/cards/default/:id', verifyUser("ANY"), defaultCard)
 router.get('/cards', verifyUser('ANY'), getCards)
 router.post("/confirm-payment", verifyUser("ANY"), confirmPayment);
 

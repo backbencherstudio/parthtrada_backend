@@ -45,6 +45,17 @@ export const createCard = async (req: AuthenticatedRequest, res: Response) => {
 
     await stripe.paymentMethods.attach(paymentMethod.id, { customer: user.customer_id });
 
+    let default_card = false
+    const payment_methods = await prisma.paymentMethod.findFirst({
+      where: {
+        userId: user_id
+      }
+    })
+
+    if (!payment_methods) {
+      default_card = true
+    }
+
     const payload = {
       provider: 'stripe',
       userId: user_id,
@@ -53,6 +64,7 @@ export const createCard = async (req: AuthenticatedRequest, res: Response) => {
       expMonth: paymentMethod.card.exp_month,
       expYear: paymentMethod.card.exp_year,
       last4: paymentMethod.card.last4,
+      default: default_card
     }
 
     await prisma.paymentMethod.create({
@@ -67,6 +79,43 @@ export const createCard = async (req: AuthenticatedRequest, res: Response) => {
     res.status(400).json({ success: false, message: err.message });
   }
 }
+
+export const defaultCard = async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const user_id = req.user?.id;
+    const id = req.params.id;
+
+    const user = await prisma.users.findUnique({
+      where: { id: user_id },
+    });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found.'
+      });
+    }
+
+    await prisma.paymentMethod.updateMany({
+      where: { userId: user_id, default: true },
+      data: { default: false }
+    });
+
+    const paymentMethod = await prisma.paymentMethod.update({
+      where: { id: id },
+      data: { default: true }
+    });
+
+    return res.status(200).json({
+      message: 'Default card updated.',
+      paymentMethodId: paymentMethod.id
+    });
+
+  } catch (err: any) {
+    res.status(400).json({ success: false, message: err.message });
+  }
+};
+
 
 export const getCards = async (req: AuthenticatedRequest, res: Response) => {
   try {
@@ -150,9 +199,15 @@ export const confirmPayment = async (req: AuthenticatedRequest, res: Response) =
         await stripe.paymentIntents.update(data.paymentIntentId, { customer: user.customer_id })
 
         if (paymentIntent.status === "requires_payment_method") {
+          const payment_method = await prisma.paymentMethod.findFirst({
+            where: {
+              userId: userId,
+              default: true
+            }
+          })
           // Attach and confirm payment method
           await stripe.paymentIntents.confirm(data.paymentIntentId, {
-            payment_method: data.paymentMethodId,
+            payment_method: payment_method.method_id,
             return_url: process.env.FRONTEND_URL,
           });
         }

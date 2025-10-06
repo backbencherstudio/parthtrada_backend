@@ -47,9 +47,17 @@ export const create = async (req: AuthenticatedRequest, res: Response) => {
       where: { id: userId },
     });
 
-    const timezone = student.timezone
-    const localDateTime = moment.tz(`${data.date} ${data.time}`, "YYYY-MM-DD HH:mm", timezone);
-    const utcDateTime = localDateTime.clone().utc().toDate()
+    const timezone = student.timezone || "UTC";
+
+    let localDateTime;
+    if (timezone.toUpperCase() === "UTC") {
+      localDateTime = moment.utc(`${data.date} ${data.time}`, "YYYY-MM-DD HH:mm");
+    } else {
+      localDateTime = moment.tz(`${data.date} ${data.time}`, "YYYY-MM-DD HH:mm", timezone);
+    }
+
+    // Convert to UTC (for storing in DB)
+    const utcDateTime = localDateTime.clone().utc().toDate();
 
     const booking = await prisma.booking.create({
       data: {
@@ -95,20 +103,6 @@ export const create = async (req: AuthenticatedRequest, res: Response) => {
         status: "PENDING",
       },
     });
-
-    // await prisma.notification.create({
-    //   data: {
-    //     image: booking.student.image,
-    //     title: booking.student.name,
-    //     message: `Wants to take your consultation on the ${expertMoment.toDate()}`,
-    //     type: 'BOOKING_REQUESTED',
-    //     sender_id: booking.studentId,
-    //     recipientId: booking.expertId,
-    //     meta: {
-    //       booking_id: booking.id
-    //     }
-    //   }
-    // })
 
     return res.json({
       success: true,

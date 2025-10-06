@@ -139,15 +139,18 @@ model Notification {
 }
 
 model PaymentMethod {
-  id        String  @id @default(cuid())
-  provider  String
-  method_id String  @unique
-  brand     String?
-  last4     String?
-  expMonth  Int?
-  expYear   Int?
-  userId    String
-  user      Users   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id         String   @id @default(cuid())
+  provider   String
+  method_id  String   @unique
+  brand      String?
+  last4      String?
+  expMonth   Int?
+  expYear    Int?
+  userId     String
+  default    Boolean  @default(false)
+  user       Users    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
 }
 
 model Users {

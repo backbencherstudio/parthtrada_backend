@@ -32,14 +32,12 @@ export const savePaymentMethodSchema = z.object({
 
 export const confirmPaymentSchema = z.object({
   paymentIntentId: z.string().min(1, { error: 'Payment Intent ID is required.' }),
-  paymentMethodId: z.string().min(1, { error: 'Payment Method ID is required.' }),
 });
 
 export const refundTransactionSchema = z.object({
   bookingId: z.string().min(1, { error: 'Booking ID is required.' }),
   reason: z.string().optional(),
 });
-
 
 export const payoutsSchema = z.object({
   amount: z.number(),
