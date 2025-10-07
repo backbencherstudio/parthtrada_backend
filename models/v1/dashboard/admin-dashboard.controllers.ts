@@ -218,7 +218,7 @@ export const userById = async (req: Request, res: Response): Promise<any> => {
       return res.status(400).json({ success: false, message: "Please provide expert ID." });
     }
 
-    const user = await prisma.users.findUnique({
+    const { studentProfile, ...user } = await prisma.users.findUnique({
       where: { id: id },
       include: {
         studentProfile: true,
@@ -232,7 +232,10 @@ export const userById = async (req: Request, res: Response): Promise<any> => {
     return res.status(200).json({
       success: true,
       message: "User fetched successfully.",
-      data: user,
+      data: {
+        ...user,
+        meta: studentProfile
+      },
     });
   } catch (error) {
     console.error("Dashboard experts list error", error);

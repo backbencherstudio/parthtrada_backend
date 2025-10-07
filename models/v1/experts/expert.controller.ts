@@ -405,14 +405,13 @@ export const acceptRejectBooking = async (req: AuthenticatedRequest, res: Respon
       return;
     }
 
-    let newStatus: "UPCOMING" | "CANCELLED";
-    let message: string;
-    let meetingLink: string | undefined;
-    let meetingID: number | undefined
-    let refund_reason: string | undefined
-
     const studentTimezone = booking.student.timezone;
     const studentLocalTime = moment.utc(booking.date).tz(studentTimezone)
+
+    let newStatus, meetingID, meetingLink, message, refund_reason;
+    let updatedMetaTexts = [];
+    let newNotificationType: 'BOOKING_CONFIRMED' | 'BOOKING_CANCELLED_BY_EXPERT';
+    let newNotificationMessage = '';
 
     if (action === 'accept') {
       const zoomMeeting = await createZoomMeeting({
@@ -422,92 +421,66 @@ export const acceptRejectBooking = async (req: AuthenticatedRequest, res: Respon
         agenda: JSON.stringify(booking.sessionDetails),
         timezone: booking?.expert?.timezone || "UTC",
       });
-      meetingID = zoomMeeting.id
+
+      meetingID = zoomMeeting.id;
       meetingLink = zoomMeeting.join_url;
       newStatus = "UPCOMING";
       message = "Booking accepted successfully";
-      const notification = await prisma.notification.findUnique({
-        where: { id: notification_id },
-        select: { meta: true },
-      })
 
-      if (!notification) throw new Error("Notification not found")
-
-      const currentMeta = (notification.meta && typeof notification.meta === 'object')
-        ? notification.meta
-        : {}
-
-      // Merge existing meta with new key
-      const updatedMeta = {
-        ...currentMeta,
-        texts: ['Decline', 'Accepted'],
-      }
-
-      await prisma.notification.update({
-        where: { id: notification_id },
-        data: { meta: updatedMeta },
-      })
-
-      await prisma.notification.create({
-        data: {
-          type: 'BOOKING_CONFIRMED',
-          image: booking.expert.image,
-          title: booking.expert.name,
-          message: `Accept your consultation request on ${studentLocalTime}`,
-          sender_id: booking.expert.id,
-          recipientId: booking.student.id,
-          meta: {
-            booking_id: booking.id,
-            sessionDetails: null,
-            disabled: true,
-            texts: []
-          },
-        }
-      })
+      updatedMetaTexts = ['Decline', 'Accepted'];
+      newNotificationType = 'BOOKING_CONFIRMED';
+      newNotificationMessage = `Accept your consultation request on ${studentLocalTime}`;
     } else {
-      await prisma.notification.create({
-        data: {
-          type: 'BOOKING_CANCELLED_BY_EXPERT',
-          image: booking.expert.image,
-          title: booking.expert.name,
-          message: `Reject your consultation request on ${studentLocalTime}`,
-          sender_id: booking.expert.id,
-          recipientId: booking.student.id,
-          meta: {
-            booking_id: booking.id,
-            sessionDetails: null,
-            disabled: true,
-            texts: []
-          },
-        }
-      })
-
-      const notification = await prisma.notification.findUnique({
-        where: { id: notification_id },
-        select: { meta: true },
-      })
-
-      if (!notification) throw new Error("Notification not found")
-
-      const currentMeta = (notification.meta && typeof notification.meta === 'object')
-        ? notification.meta
-        : {}
-
-      // Merge existing meta with new key
-      const updatedMeta = {
-        ...currentMeta,
-        texts: ['Declined', 'Accept'],
-      }
-
-      await prisma.notification.update({
-        where: { id: notification_id },
-        data: { meta: updatedMeta },
-      })
-
       newStatus = "CANCELLED";
-      refund_reason = "Cancelled The Meeting"
+      refund_reason = "Cancelled The Meeting";
       message = "Booking rejected successfully";
+
+      updatedMetaTexts = ['Declined', 'Accept'];
+      newNotificationType = 'BOOKING_CANCELLED_BY_EXPERT';
+      newNotificationMessage = `Reject your consultation request on ${studentLocalTime}`;
     }
+
+    // Common: update the original notification
+    const notification = await prisma.notification.findUnique({
+      where: { id: notification_id },
+      select: { meta: true },
+    });
+
+    if (!notification) throw new Error("Notification not found");
+
+    const currentMeta = (notification.meta && typeof notification.meta === 'object')
+      ? notification.meta
+      : {};
+
+    await prisma.notification.update({
+      where: { id: notification_id },
+      data: {
+        meta: {
+          ...currentMeta,
+          disabled: true,
+          texts: updatedMetaTexts,
+        },
+      },
+    });
+
+    // Common: create the new notification
+    await prisma.notification.create({
+      data: {
+        type: newNotificationType,
+        image: booking.expert.image,
+        title: booking.expert.name,
+        message: newNotificationMessage,
+        sender_id: booking.expert.id,
+        recipientId: booking.student.id,
+        meta: {
+          booking_id: booking.id,
+          sessionDetails: null,
+          disabled: true,
+          texts: [],
+        },
+      },
+    });
+
 
     // Update the booking status
     await prisma.booking.update({
