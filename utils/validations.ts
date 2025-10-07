@@ -107,6 +107,18 @@ export const profileSchema = z.object({
     .refine((tz) => validTimezones.includes(tz), {
       message: "Invalid timezone",
     })
+    .optional(),
+  profession: z
+    .string("Profession must be a string")
+    .optional(),
+  organization: z
+    .string("Organization must be a string")
+    .optional(),
+  location: z
+    .string("Location must be a string")
+    .optional(),
+  description: z
+    .string("Description must be a string")
     .optional()
 })
 export const cardSchema = z.object({

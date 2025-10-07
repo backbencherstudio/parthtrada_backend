@@ -181,7 +181,7 @@ export const stats = async (req: Request, res: Response) => {
         mentors: total_experts,
         sessions: total_bookings,
         users: total_users,
-        rating: avg_ratings._avg.rating.toFixed(2)
+        rating: avg_ratings?._avg.rating?.toFixed(2) ?? Number(0).toFixed(2)
       }
     });
   } catch (error) {

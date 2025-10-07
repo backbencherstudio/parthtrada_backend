@@ -68,27 +68,27 @@ export default async function getDashboardStats() {
         users: {
             total: totalUsers,
             today: todayUsers,
-            percentage: percent(todayUsers, totalUsers),
+            percentage: percent(todayUsers, totalUsers) === "100.00" ? "100": percent(todayUsers, totalUsers),
         },
         students: {
             total: studentCount,
             today: todayStudents,
-            percentage: percent(todayStudents, studentCount),
+            percentage: percent(todayStudents, studentCount) === "100.00" ? "100": percent(todayStudents, studentCount),
         },
         experts: {
             total: expertCount,
             today: todayExperts,
-            percentage: percent(todayExperts, expertCount),
+            percentage: percent(todayExperts, expertCount) === "100.00" ? "100": percent(todayExperts, expertCount),
         },
         bookings: {
             total: totalBookings,
             today: todayBookings,
-            percentage: percent(todayBookings, totalBookings),
+            percentage: percent(todayBookings, totalBookings) === "100.00" ? "100": percent(todayBookings, totalBookings),
         },
         transactions: {
             total: totalTransactionAmount,
             today: todayTransactionAmount,
-            percentage: percent(todayTransactionAmount, totalTransactionAmount),
+            percentage: percent(todayTransactionAmount, totalTransactionAmount) === "100.00" ? "100": percent(todayTransactionAmount, totalTransactionAmount),
         },
     };
 

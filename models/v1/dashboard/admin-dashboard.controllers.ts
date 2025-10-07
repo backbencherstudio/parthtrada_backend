@@ -39,7 +39,9 @@ export const dashboard = async (req: Request, res: Response): Promise<void> => {
       orderBy: { createdAt: 'desc' },
       take: 4,
       select: {
+        id: true,
         name: true,
+        image: true,
         activeProfile: true,
         email: true,
         createdAt: true,
@@ -54,6 +56,7 @@ export const dashboard = async (req: Request, res: Response): Promise<void> => {
       select: {
         id: true,
         name: true,
+        image: true,
         createdAt: true,
         expertProfile: {
           select: { hourlyRate: true }
@@ -173,6 +176,7 @@ export const users = async (req: Request, res: Response): Promise<void> => {
         select: {
           id: true,
           name: true,
+          image: true,
           email: true,
           activeProfile: true,
           createdAt: true,
@@ -245,6 +249,7 @@ export const experts = async (req: Request, res: Response): Promise<void> => {
         select: {
           id: true,
           name: true,
+          image: true,
           email: true,
           activeProfile: true,
           createdAt: true,
@@ -649,6 +654,7 @@ export const expertById = async (req: Request, res: Response): Promise<any> => {
         expert: {
           id: expert.id,
           name: expert.user.name,
+          image: expert.user.image,
           metadata: {
             status: expert.status,
             description: expert.description,

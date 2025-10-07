@@ -231,7 +231,10 @@ export const confirmPayment = async (req: AuthenticatedRequest, res: Response) =
               sender_id: transaction.booking.studentId,
               recipientId: transaction.booking.expertId,
               meta: {
-                booking_id: transaction.booking.id
+                booking_id: transaction.booking.id,
+                sessionDetails: transaction.booking.sessionDetails,
+                disabled: false,
+                texts: ['Decline', 'Accept']
               }
             }
           })

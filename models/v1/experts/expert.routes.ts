@@ -13,7 +13,7 @@ router.get('/:id/reviews', verifyUser('ANY'), getExpertReviews)
 router.get("/expert-schedule", verifyUser("EXPERT"), expertSchedule);
 
 // Expert booking actions
-router.patch("/bookings/actions/:id/:action", verifyUser("EXPERT"), acceptRejectBooking);
+router.patch("/bookings/actions/:id/:action/:notification_id", verifyUser("EXPERT"), acceptRejectBooking);
 router.post("/create-meeting-link/:bookingId", verifyUser("EXPERT"), createMeetingLink);
 router.post("/complete-session/:id", verifyUser("EXPERT"), markSessionCompleted);
 

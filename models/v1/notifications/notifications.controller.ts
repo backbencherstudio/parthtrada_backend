@@ -40,32 +40,43 @@ export const index = async (req: AuthenticatedRequest, res: Response) => {
 
     const results = notifications.map(notification => {
       let booking_id: string | undefined
+      let texts: string[]
+      let disabled: boolean | undefined
       switch (notification.type) {
         case 'BOOKING_REQUESTED':
-          // @ts-ignore
-          booking_id = notification.meta?.booking_id as string
+          const meta: any = notification?.meta
+          booking_id = meta?.booking_id ?? ''
+          texts = meta?.texts ?? []
+          disabled = meta.disabled ?? false
           return {
+            id: notification.sender_id,
             img: notification.image,
             title: notification.title,
             description: notification.message,
             actions: [
               {
                 bg_primary: false,
-                text: 'Decline',
-                url: `/experts/bookings/actions/${booking_id}/reject`,
-                req_method: 'PATCH'
+                text: texts[0] ?? null,
+                url: `/experts/bookings/actions/${booking_id}/reject/${notification.id}`,
+                req_method: 'PATCH',
+                disabled: disabled
               },
               {
                 bg_primary: true,
-                text: 'Accept',
-                url: `/experts/bookings/actions/${booking_id}/accept`,
-                req_method: 'PATCH'
+                text: texts[1] ?? null,
+                url: `/experts/bookings/actions/${booking_id}/accept/${notification.id}`,
+                req_method: 'PATCH',
+                disabled: false
               }
-            ]
+            ],
+            meta: {
+              // @ts-ignore
+              sessionDetails: notification.meta?.sessionDetails ?? null
+            }
           }
         case 'BOOKING_CONFIRMED':
-            // @ts-ignore
-            booking_id = notification.meta?.booking_id as string
+          // @ts-ignore
+          booking_id = notification.meta?.booking_id as string
           return {
             img: notification.image,
             title: notification.title,
@@ -73,8 +84,8 @@ export const index = async (req: AuthenticatedRequest, res: Response) => {
             actions: []
           }
         case 'BOOKING_CANCELLED_BY_EXPERT':
-            // @ts-ignore
-            booking_id = notification.meta?.booking_id as string
+          // @ts-ignore
+          booking_id = notification.meta?.booking_id as string
           return {
             img: notification.image,
             title: notification.title,

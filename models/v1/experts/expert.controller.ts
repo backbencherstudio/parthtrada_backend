@@ -341,7 +341,7 @@ export const getReviews = async (req: AuthenticatedRequest, res: Response) => {
 
 export const acceptRejectBooking = async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { id, action } = req.params;
+    const { id, action, notification_id } = req.params;
     if (!["accept", "reject"].includes(action)) {
       return res.status(400).json({ message: "Invalid action" });
     }
@@ -408,6 +408,7 @@ export const acceptRejectBooking = async (req: AuthenticatedRequest, res: Respon
     let newStatus: "UPCOMING" | "CANCELLED";
     let message: string;
     let meetingLink: string | undefined;
+    let meetingID: number | undefined
     let refund_reason: string | undefined
 
     const studentTimezone = booking.student.timezone;
@@ -421,9 +422,32 @@ export const acceptRejectBooking = async (req: AuthenticatedRequest, res: Respon
         agenda: JSON.stringify(booking.sessionDetails),
         timezone: booking?.expert?.timezone || "UTC",
       });
+      meetingID = zoomMeeting.id
       meetingLink = zoomMeeting.join_url;
       newStatus = "UPCOMING";
       message = "Booking accepted successfully";
+      const notification = await prisma.notification.findUnique({
+        where: { id: notification_id },
+        select: { meta: true },
+      })
+
+      if (!notification) throw new Error("Notification not found")
+
+      const currentMeta = (notification.meta && typeof notification.meta === 'object')
+        ? notification.meta
+        : {}
+
+      // Merge existing meta with new key
+      const updatedMeta = {
+        ...currentMeta,
+        texts: ['Decline', 'Accepted'],
+      }
+
+      await prisma.notification.update({
+        where: { id: notification_id },
+        data: { meta: updatedMeta },
+      })
+
       await prisma.notification.create({
         data: {
           type: 'BOOKING_CONFIRMED',
@@ -432,7 +456,12 @@ export const acceptRejectBooking = async (req: AuthenticatedRequest, res: Respon
           message: `Accept your consultation request on ${studentLocalTime}`,
           sender_id: booking.expert.id,
           recipientId: booking.student.id,
-          meta: { booking_id: booking.id },
+          meta: {
+            booking_id: booking.id,
+            sessionDetails: null,
+            disabled: true,
+            texts: []
+          },
         }
       })
     } else {
@@ -444,9 +473,37 @@ export const acceptRejectBooking = async (req: AuthenticatedRequest, res: Respon
           message: `Reject your consultation request on ${studentLocalTime}`,
           sender_id: booking.expert.id,
           recipientId: booking.student.id,
-          meta: { booking_id: booking.id },
+          meta: {
+            booking_id: booking.id,
+            sessionDetails: null,
+            disabled: true,
+            texts: []
+          },
         }
       })
+
+      const notification = await prisma.notification.findUnique({
+        where: { id: notification_id },
+        select: { meta: true },
+      })
+
+      if (!notification) throw new Error("Notification not found")
+
+      const currentMeta = (notification.meta && typeof notification.meta === 'object')
+        ? notification.meta
+        : {}
+
+      // Merge existing meta with new key
+      const updatedMeta = {
+        ...currentMeta,
+        texts: ['Declined', 'Accept'],
+      }
+
+      await prisma.notification.update({
+        where: { id: notification_id },
+        data: { meta: updatedMeta },
+      })
+
       newStatus = "CANCELLED";
       refund_reason = "Cancelled The Meeting"
       message = "Booking rejected successfully";
@@ -455,7 +512,7 @@ export const acceptRejectBooking = async (req: AuthenticatedRequest, res: Respon
     // Update the booking status
     await prisma.booking.update({
       where: { id: id },
-      data: { status: newStatus, refund_reason: refund_reason ?? null, meetingLink },
+      data: { status: newStatus, refund_reason: refund_reason ?? null, meetingLink, meetingID: meetingID },
     });
 
     res.status(200).json({

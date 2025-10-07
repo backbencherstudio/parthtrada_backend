@@ -790,7 +790,8 @@ export const register = async (req: Request, res: Response) => {
     await prisma.users.create({
       data: {
         linkedin_id: uuidv4(),
-        ...payload
+        ...payload,
+        activeProfile: 'ADMIN'
       }
     })
 
