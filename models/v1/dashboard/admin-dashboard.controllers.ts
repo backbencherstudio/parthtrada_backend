@@ -57,6 +57,7 @@ export const dashboard = async (req: Request, res: Response): Promise<void> => {
         id: true,
         name: true,
         image: true,
+        email: true,
         createdAt: true,
         expertProfile: {
           select: { hourlyRate: true }
@@ -77,7 +78,10 @@ export const dashboard = async (req: Request, res: Response): Promise<void> => {
         _avg: { rating: true }
       });
       return {
+        id: true,
         name: expert.name,
+        email: expert.email,
+        image: true,
         sessionFee: expert.expertProfile?.hourlyRate,
         totalSession: totalSessions,
         totalStudent: totalStudents.length,
@@ -207,6 +211,38 @@ export const users = async (req: Request, res: Response): Promise<void> => {
   }
 };
 
+export const userById = async (req: Request, res: Response): Promise<any> => {
+  try {
+    const id = req.params?.id;
+    if (!id) {
+      return res.status(400).json({ success: false, message: "Please provide expert ID." });
+    }
+
+    const user = await prisma.users.findUnique({
+      where: { id: id },
+      include: {
+        studentProfile: true,
+      }
+    });
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found." });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "User fetched successfully.",
+      data: user,
+    });
+  } catch (error) {
+    console.error("Dashboard experts list error", error);
+    res.status(500).json({
+      success: false,
+      message: error instanceof Error ? error.message : "Internal server error",
+    });
+  }
+};
+
 export const experts = async (req: Request, res: Response): Promise<void> => {
   try {
 
@@ -239,6 +275,7 @@ export const experts = async (req: Request, res: Response): Promise<void> => {
       };
     }
 
+    // totalSession
     const [total, expertsRaw] = await Promise.all([
       prisma.users.count({ where }),
       prisma.users.findMany({
@@ -256,10 +293,13 @@ export const experts = async (req: Request, res: Response): Promise<void> => {
           expertProfile: { select: { hourlyRate: true } },
         },
       }),
-    ]);
+    ])
 
     // For each expert, get rating and total students
-    const experts = await Promise.all(expertsRaw.map(async (expert) => {
+    const experts = await Promise.all(expertsRaw.map(async ({ expertProfile, ...expert }) => {
+      const bookings = await prisma.booking.count({
+        where: { expertId: expert.id },
+      })
       const totalStudents = await prisma.booking.findMany({
         where: { expertId: expert.id },
         select: { studentId: true },
@@ -272,7 +312,11 @@ export const experts = async (req: Request, res: Response): Promise<void> => {
       return {
         ...expert,
         totalStudent: totalStudents.length,
+        sessionFee: expertProfile.hourlyRate,
+        totalSession: bookings,
         rating: ratingAgg._avg.rating ?? null,
+        joinDate: expert.createdAt,
+
       };
     }));
 
