@@ -52,9 +52,16 @@ export const createStripeAccount = async (
         first_name: expert.user.name?.split(" ")[0],
         last_name: expert.user.name?.split(" ")[1] || "",
       },
+      business_profile: {
+        url: 'https://e-learning.com',
+        mcc: '8299' // for business category code
+      },
       capabilities: {
         transfers: { requested: true },
       },
+      metadata: {
+        user_id: userId
+      }
     });
 
     // Update expert with Stripe account ID

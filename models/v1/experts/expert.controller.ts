@@ -4,6 +4,7 @@ import moment from 'moment-timezone'
 import { AuthenticatedRequest } from "@/middleware/verifyUsers";
 import { createZoomMeeting } from "@/utils/zoom.utils";
 import { expertScheduleQuerySchema, expertsQuerySchema } from "@/utils/queryValidation";
+import { accept_booking } from "@/utils/notification";
 
 const prisma = new PrismaClient();
 
@@ -412,24 +413,42 @@ export const acceptRejectBooking = async (req: AuthenticatedRequest, res: Respon
     let updatedMetaTexts = [];
     let newNotificationType: 'BOOKING_CONFIRMED' | 'BOOKING_CANCELLED_BY_EXPERT';
     let newNotificationMessage = '';
+    let newTexts: string[] = []
 
     if (action === 'accept') {
-      const zoomMeeting = await createZoomMeeting({
-        topic: `Session with ${booking.student.name ?? 'Student'}`,
-        startTime: booking.expertDateTime,
-        duration: booking.sessionDuration,
-        agenda: JSON.stringify(booking.sessionDetails),
-        timezone: booking?.expert?.timezone || "UTC",
-      });
+      const payload = {
+        booking: {
+          agenda: JSON.stringify(booking.sessionDetails),
+          expert: {
+            timezone: booking?.expert?.timezone ?? "UTC",
+          },
+          expertDateTime: booking.expertDateTime,
+          sessionDuration: booking.sessionDuration,
+        },
+        student: {
+          name: booking.student.name,
+          timezone: studentLocalTime,
+        },
+      };
 
-      meetingID = zoomMeeting.id;
-      meetingLink = zoomMeeting.join_url;
-      newStatus = "UPCOMING";
-      message = "Booking accepted successfully";
+      const {
+        meeting_id,
+        meeting_link,
+        new_message,
+        new_notification_message,
+        new_notification_type,
+        new_status,
+        updated_meta_texts,
+      } = await accept_booking(payload);
 
-      updatedMetaTexts = ['Decline', 'Accepted'];
-      newNotificationType = 'BOOKING_CONFIRMED';
-      newNotificationMessage = `Accept your consultation request on ${studentLocalTime}`;
+      meetingID = meeting_id;
+      meetingLink = meeting_link;
+      newStatus = new_status;
+      message = new_message;
+
+      updatedMetaTexts = updated_meta_texts;
+      newNotificationType = new_notification_type;
+      newNotificationMessage = new_notification_message;
     } else {
       newStatus = "CANCELLED";
       refund_reason = "Cancelled The Meeting";
@@ -452,14 +471,16 @@ export const acceptRejectBooking = async (req: AuthenticatedRequest, res: Respon
       ? notification.meta
       : {};
 
+    const payload = {
+      ...currentMeta,
+      disabled: true,
+      texts: updatedMetaTexts,
+    }
+
     await prisma.notification.update({
       where: { id: notification_id },
       data: {
-        meta: {
-          ...currentMeta,
-          disabled: true,
-          texts: updatedMetaTexts,
-        },
+        meta: payload,
       },
     });
 
@@ -476,7 +497,7 @@ export const acceptRejectBooking = async (req: AuthenticatedRequest, res: Respon
           booking_id: booking.id,
           sessionDetails: null,
           disabled: true,
-          texts: [],
+          texts: newTexts,
         },
       },
     });

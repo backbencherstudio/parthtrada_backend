@@ -47,7 +47,7 @@ export const index = async (req: AuthenticatedRequest, res: Response) => {
           const meta: any = notification?.meta
           booking_id = meta?.booking_id ?? ''
           texts = meta?.texts ?? []
-          disabled = meta.disabled ?? false
+          disabled = meta?.disabled ?? false
           return {
             id: notification.sender_id,
             img: notification.image,
@@ -66,7 +66,7 @@ export const index = async (req: AuthenticatedRequest, res: Response) => {
                 text: texts[1] ?? null,
                 url: `/experts/bookings/actions/${booking_id}/accept/${notification.id}`,
                 req_method: 'PATCH',
-                disabled: false
+                disabled: disabled
               }
             ],
             meta: {

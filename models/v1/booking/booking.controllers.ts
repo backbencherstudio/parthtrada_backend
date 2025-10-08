@@ -86,6 +86,7 @@ export const create = async (req: AuthenticatedRequest, res: Response) => {
       },
       automatic_payment_methods: { enabled: true, allow_redirects: 'always' },
       capture_method: 'manual',
+      receipt_email: booking.student.email,
       metadata: {
         bookingId: booking.id,
         studentId: userId!,
@@ -354,7 +355,7 @@ export const bookingRequest = async (req: AuthenticatedRequest, res: Response) =
         },
         skip,
         take: perPage,
-        orderBy: { date: "desc" },
+        orderBy: { createdAt: "desc" },
       }),
       prisma.booking.count({ where })
     ])
