@@ -1,10 +1,11 @@
-import Stripe from 'stripe';
+import stripe from "@/services/stripe";
+import { PrismaClient } from "@prisma/client";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: '2025-08-27.basil' });
+const prisma = new PrismaClient()
 
 const secret = process.env.STRIPE_WEBHOOK_SECRET
 
-export const handleWebhook = (req, res) => {
+export const handleWebhook = async (req, res) => {
     const sig = req.headers['stripe-signature'];
     let event;
 
@@ -22,6 +23,50 @@ export const handleWebhook = (req, res) => {
                 break;
             case 'payment_method.attached':
                 const paymentMethod = event.data.object;
+                break;
+            case 'refund.updated':
+                const metadata = event.data.object.metadata
+                try {
+                    const booking = await prisma.booking.findUnique({
+                        where: {
+                            id: metadata.booking_id
+                        },
+                        include: {
+                            expert: true,
+                            student: true
+                        }
+                    })
+
+                    await prisma.transaction.update({
+                        where: {
+                            id: metadata?.transaction_id
+                        },
+                        data: {
+                            status: 'REFUNDED'
+                        }
+                    })
+
+                    await prisma.notification.create({
+                        data: {
+                            type: 'REFUND_REVIEW',
+                            image: booking.expert.image,
+                            title: booking.expert.name,
+                            message: 'Expert marked the refund as sent. Dit it reach you?',
+                            sender_id: booking.expert.id,
+                            recipientId: booking.student.id,
+                            meta: {
+                                booking_id: booking.id,
+                                sessionDetails: null,
+                                disabled: false,
+                                texts: ['Confirm Received'],
+                            }
+                        }
+                    })
+                } catch (error) {
+                    console.log('=============error from stripe webhook refund.updated=======================');
+                    console.error(error?.message);
+                    console.log('====================================');
+                }
                 break;
             default:
                 console.log('=================================================================================');

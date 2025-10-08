@@ -19,15 +19,13 @@ export const create = async (req: AuthenticatedRequest, res: Response) => {
 
     const { data, error, success } = bookingSchema.safeParse(req.body);
     if (!success) {
-      if (!success) {
-        return res.status(400).json({
-          success: false,
-          errors: JSON.parse(error.message).map(err => ({
-            field: err.path.join("."),
-            message: err.message,
-          })),
-        });
-      }
+      return res.status(400).json({
+        success: false,
+        errors: JSON.parse(error.message).map(err => ({
+          field: err.path.join("."),
+          message: err.message,
+        })),
+      });
     }
 
     // Check if expert has completed Stripe onboarding

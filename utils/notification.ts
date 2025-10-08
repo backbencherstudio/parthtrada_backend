@@ -1,3 +1,4 @@
+import stripe from "@/services/stripe";
 import { createZoomMeeting } from "@/utils/zoom.utils";
 import { PrismaClient, Notification, Prisma } from "@prisma/client";
 import moment from "moment-timezone";
@@ -63,20 +64,26 @@ export const cancel_booking = async (booking: BookingWithRelations) => {
         },
     });
 
-    await prisma.notification.create({
-        data: {
-            type: 'REFUND_REVIEW',
-            image: booking.expert.image,
-            title: booking.expert.name,
-            message: 'Expert marked the refund as sent. Dit it reach you?',
-            sender_id: booking.expert.id,
-            recipientId: booking.student.id,
-            meta: {
-                booking_id: booking.id,
-                sessionDetails: null,
-                disabled: false,
-                texts: ['Confirm Received'],
-            }
+    const transaction = await prisma.transaction.findUnique({
+        where: {
+            bookingId: booking.id
+        },
+        select: {
+            id: true,
+            amount: true,
+            providerId: true,
+        }
+    })
+
+    await stripe.refunds.create({
+        payment_intent: transaction.providerId,
+        amount: transaction.amount * 100,
+        reverse_transfer: true,
+        refund_application_fee: true,
+        metadata: {
+            type: 'BOOKING_CANCELLED_BY_EXPERT',
+            booking_id: booking.id,
+            transaction_id: transaction.id
         }
     })
 

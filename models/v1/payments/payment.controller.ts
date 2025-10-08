@@ -334,13 +334,14 @@ export const transactions = async (req: AuthenticatedRequest, res: Response) => 
             select: {
               id: true,
               amount: true,
-              createdAt: true
+              createdAt: true,
+              updatedAt: true
             }
           }
         },
         skip,
         take: perPage,
-        orderBy: { date: "desc" },
+        orderBy: { updatedAt: "desc" },
       })
 
       transactions = raw_transactions.map(item => ({ name: item.expert.name, status: item.status, refund_reason: item.refund_reason, ...item.transaction }))
@@ -375,13 +376,14 @@ export const transactions = async (req: AuthenticatedRequest, res: Response) => 
               id: true,
               status: true,
               amount: true,
-              createdAt: true
+              createdAt: true,
+              updatedAt: true
             }
           }
         },
         skip,
         take: perPage,
-        orderBy: { date: "desc" },
+        orderBy: { updatedAt: "desc" },
       })
 
       transactions = raw_transactions.map(item => ({ name: item.student.name, refund_reason: item.refund_reason, ...item.transaction }))
