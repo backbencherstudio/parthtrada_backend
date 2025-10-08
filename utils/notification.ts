@@ -1,49 +1,38 @@
 import { createZoomMeeting } from "@/utils/zoom.utils";
-import { PrismaClient, Notification } from "@prisma/client";
-import { Moment } from "moment-timezone";
+import { PrismaClient, Notification, Prisma } from "@prisma/client";
+import moment from "moment-timezone";
 
 const prisma = new PrismaClient()
 
-type AcceptBookingRequest = {
-    student: {
-        name: string;
-        timezone: Moment;
-    };
-    booking: {
-        expertDateTime: Date;
-        sessionDuration: number;
-        agenda: string;
-        expert: {
-            timezone: string;
-        };
-    };
-};
+type BookingWithRelations = Prisma.BookingGetPayload<{
+    include: { expert: true, student: true };
+}>;
 
-type RejectBookingRequest = {
-    booking_id: string
-    sender_id: string
-    recipient_id: string
-    expert: {
-        image: string
-        name: string
-    }
-    student: {
-        timezone: Moment
-    }
-}
-
-export const accept_booking = async (data: AcceptBookingRequest) => {
-    const {
-        student,
-        booking: { expertDateTime, sessionDuration, agenda, expert },
-    } = data;
+export const accept_booking = async (booking: BookingWithRelations) => {
 
     const zoomMeeting = await createZoomMeeting({
-        topic: `Session with ${student.name || "Student"}`,
-        startTime: expertDateTime,
-        duration: sessionDuration,
-        agenda,
-        timezone: expert?.timezone ?? "UTC",
+        topic: `Session with ${booking.student.name || "Student"}`,
+        startTime: booking.expertDateTime,
+        duration: booking.sessionDuration,
+        agenda: JSON.stringify(booking.sessionDetails),
+        timezone: booking?.expert?.timezone ?? "UTC",
+    });
+
+    await prisma.notification.create({
+        data: {
+            type: "BOOKING_CONFIRMED",
+            image: booking.expert.image,
+            title: booking.expert.name,
+            message: `Accepted your consultation request on ${moment.utc(booking.date).tz(booking.student.timezone)}`,
+            sender_id: booking.expert.id,
+            recipientId: booking.student.id,
+            meta: {
+                booking_id: booking.id,
+                sessionDetails: null,
+                disabled: true,
+                texts: ["Decline", "Accepted"],
+            },
+        },
     });
 
     return {
@@ -52,23 +41,38 @@ export const accept_booking = async (data: AcceptBookingRequest) => {
         new_status: "UPCOMING",
         new_message: "Booking accepted successfully",
         updated_meta_texts: ["Decline", "Accepted"],
-        new_notification_type: "BOOKING_CONFIRMED" as const,
-        new_notification_message: `Accepted your consultation request on ${student.timezone}`,
     };
 };
 
-export const cancel_booking = async (data: RejectBookingRequest) => {
+export const cancel_booking = async (booking: BookingWithRelations) => {
+
+    await prisma.notification.create({
+        data: {
+            type: 'BOOKING_CANCELLED_BY_EXPERT',
+            image: booking.expert.image,
+            title: booking.expert.name,
+            message: `Reject your consultation request on ${moment.utc(booking.date).tz(booking.student.timezone)}`,
+            sender_id: booking.expert.id,
+            recipientId: booking.student.id,
+            meta: {
+                booking_id: booking.id,
+                sessionDetails: null,
+                disabled: true,
+                texts: ['Declined', 'Accept'],
+            },
+        },
+    });
 
     await prisma.notification.create({
         data: {
             type: 'REFUND_REVIEW',
-            image: data.expert.image,
-            title: data.expert.name,
+            image: booking.expert.image,
+            title: booking.expert.name,
             message: 'Expert marked the refund as sent. Dit it reach you?',
-            sender_id: data.sender_id,
-            recipientId: data.recipient_id,
+            sender_id: booking.expert.id,
+            recipientId: booking.student.id,
             meta: {
-                booking_id: data.booking_id,
+                booking_id: booking.id,
                 sessionDetails: null,
                 disabled: false,
                 texts: ['Confirm Received'],
@@ -81,8 +85,6 @@ export const cancel_booking = async (data: RejectBookingRequest) => {
         refund_reason: 'Cancelled The Meeting',
         new_message: "Booking rejected successfully",
         updated_meta_texts: ['Declined', 'Accept'],
-        new_notification_type: 'BOOKING_CANCELLED_BY_EXPERT' as const,
-        new_notification_message: `Reject your consultation request on ${data.student.timezone}`,
     };
 }
 
@@ -139,11 +141,20 @@ export const index = (notifications: Notification[]) => {
                     img: notification.image,
                     title: notification.title,
                     description: notification.message,
+                    actions: []
+                }
+            case 'REFUND_REVIEW':
+                // @ts-ignore
+                booking_id = notification.meta?.booking_id as string
+                return {
+                    img: notification.image,
+                    title: notification.title,
+                    description: notification.message,
                     actions: [
                         {
                             bg_primary: true,
-                            text: 'Refund',
-                            url: `refund_req`,
+                            text: notification.message,
+                            url: `/payments/bookings/${booking_id}/refunds/${notification.id}/review`,
                             req_method: 'POST'
                         }
                     ]

@@ -399,72 +399,31 @@ export const acceptRejectBooking = async (req: AuthenticatedRequest, res: Respon
       return;
     }
 
-    const studentTimezone = booking.student.timezone;
-    const studentLocalTime = moment.utc(booking.date).tz(studentTimezone)
-
     let newStatus, meetingID, meetingLink, message, refund_reason;
     let updatedMetaTexts = [];
-    let newNotificationType: 'BOOKING_CONFIRMED' | 'BOOKING_CANCELLED_BY_EXPERT';
-    let newNotificationMessage = '';
-    let newTexts: string[] = []
 
     if (action === 'accept') {
-      const payload = {
-        booking: {
-          agenda: JSON.stringify(booking.sessionDetails),
-          expert: {
-            timezone: booking?.expert?.timezone ?? "UTC",
-          },
-          expertDateTime: booking.expertDateTime,
-          sessionDuration: booking.sessionDuration,
-        },
-        student: {
-          name: booking.student.name,
-          timezone: studentLocalTime,
-        },
-      };
-
       const {
         meeting_id,
         meeting_link,
         new_message,
-        new_notification_message,
-        new_notification_type,
         new_status,
         updated_meta_texts,
-      } = await accept_booking(payload);
+      } = await accept_booking(booking);
 
       meetingID = meeting_id;
       meetingLink = meeting_link;
       newStatus = new_status;
       message = new_message;
-
       updatedMetaTexts = updated_meta_texts;
-      newNotificationType = new_notification_type;
-      newNotificationMessage = new_notification_message;
     } else {
-      const payload = {
-        booking_id: booking.id,
-        expert: {
-          image: booking.expert.image,
-          name: booking.expert.name,
-        },
-        recipient_id: booking.student.id,
-        sender_id: booking.expert.id,
-        student: {
-          timezone: studentLocalTime,
-        },
-      };
-
-      const { new_message, new_notification_message, new_notification_type, new_status, refund_reason: RefundReason, updated_meta_texts } = await cancel_booking(payload)
+      const { new_message, new_status, refund_reason: RefundReason, updated_meta_texts } = await cancel_booking(booking)
 
       newStatus = new_status;
       refund_reason = RefundReason;
       message = new_message;
 
       updatedMetaTexts = updated_meta_texts;
-      newNotificationType = new_notification_type;
-      newNotificationMessage = new_notification_message;
     }
 
     // Common: update the original notification
@@ -489,24 +448,6 @@ export const acceptRejectBooking = async (req: AuthenticatedRequest, res: Respon
       where: { id: notification_id },
       data: {
         meta: payload,
-      },
-    });
-
-    // Common: create the new notification
-    await prisma.notification.create({
-      data: {
-        type: newNotificationType,
-        image: booking.expert.image,
-        title: booking.expert.name,
-        message: newNotificationMessage,
-        sender_id: booking.expert.id,
-        recipientId: booking.student.id,
-        meta: {
-          booking_id: booking.id,
-          sessionDetails: null,
-          disabled: true,
-          texts: newTexts,
-        },
       },
     });
 

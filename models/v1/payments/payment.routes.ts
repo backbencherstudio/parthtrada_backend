@@ -1,5 +1,5 @@
 import express, { Router } from 'express';
-import { balance, confirmPayment, createCard, defaultCard, getCards, payouts, refundTransaction, transactions } from './payment.controller';
+import { balance, confirmPayment, createCard, defaultCard, getCards, payouts, refundReview, refundTransaction, transactions } from './payment.controller';
 import { verifyUser } from '@/middleware/verifyUsers';
 import { checkOnboardingStatus, createStripeAccount, getOnboardingLink, updateOnboardStatus, webhook } from './stripe.controllers';
 
@@ -13,6 +13,7 @@ router.post('/add-card', verifyUser("ANY"), createCard)
 router.patch('/cards/default/:id', verifyUser("ANY"), defaultCard)
 router.get('/cards', verifyUser('ANY'), getCards)
 router.post("/confirm-payment", verifyUser("ANY"), confirmPayment);
+router.post('/bookings/:booking_id/refunds/:notification_id/review', refundReview)
 
 // expert routes
 router.post("/experts/refund", verifyUser("EXPERT"), refundTransaction);

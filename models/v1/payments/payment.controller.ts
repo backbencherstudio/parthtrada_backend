@@ -268,6 +268,8 @@ export const confirmPayment = async (req: AuthenticatedRequest, res: Response) =
   }
 };
 
+export const refundReview = async (req: AuthenticatedRequest, res: Response) => { }
+
 export const transactions = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const query = paginationQuerySchema.safeParse(req.query);
