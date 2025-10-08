@@ -161,10 +161,10 @@ export const index = (notifications: Notification[]) => {
                     actions: [
                         {
                             bg_primary: true,
-                            text: m.texts[0],
+                            text: m.texts?.[0],
                             url: `/payments/bookings/${booking_id}/refunds/${notification.id}/review`,
                             req_method: 'POST',
-                            disabled: m.texts[0] === 'Confirmed' ? true : false
+                            disabled: m.texts?.[0] === 'Confirmed' ? true : false
                         }
                     ]
                 }
