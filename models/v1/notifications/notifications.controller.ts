@@ -2,6 +2,7 @@ import { AuthenticatedRequest } from '@/middleware/verifyUsers'
 import { paginationQuerySchema } from '@/utils/queryValidation'
 import { PrismaClient } from '@prisma/client'
 import { Response } from 'express'
+import { index as notification_index } from '@/utils/notification';
 
 const prisma = new PrismaClient()
 
@@ -38,76 +39,7 @@ export const index = async (req: AuthenticatedRequest, res: Response) => {
       }
     })
 
-    const results = notifications.map(notification => {
-      let booking_id: string | undefined
-      let texts: string[]
-      let disabled: boolean | undefined
-      switch (notification.type) {
-        case 'BOOKING_REQUESTED':
-          const meta: any = notification?.meta
-          booking_id = meta?.booking_id ?? ''
-          texts = meta?.texts ?? []
-          disabled = meta?.disabled ?? false
-          return {
-            id: notification.sender_id,
-            img: notification.image,
-            title: notification.title,
-            description: notification.message,
-            actions: [
-              {
-                bg_primary: false,
-                text: texts[0] ?? null,
-                url: `/experts/bookings/actions/${booking_id}/reject/${notification.id}`,
-                req_method: 'PATCH',
-                disabled: disabled
-              },
-              {
-                bg_primary: true,
-                text: texts[1] ?? null,
-                url: `/experts/bookings/actions/${booking_id}/accept/${notification.id}`,
-                req_method: 'PATCH',
-                disabled: disabled
-              }
-            ],
-            meta: {
-              // @ts-ignore
-              sessionDetails: notification.meta?.sessionDetails ?? null
-            }
-          }
-        case 'BOOKING_CONFIRMED':
-          // @ts-ignore
-          booking_id = notification.meta?.booking_id as string
-          return {
-            img: notification.image,
-            title: notification.title,
-            description: notification.message,
-            actions: []
-          }
-        case 'BOOKING_CANCELLED_BY_EXPERT':
-          // @ts-ignore
-          booking_id = notification.meta?.booking_id as string
-          return {
-            img: notification.image,
-            title: notification.title,
-            description: notification.message,
-            actions: [
-              {
-                bg_primary: true,
-                text: 'Refund',
-                url: `refund_req`,
-                req_method: 'POST'
-              }
-            ]
-          }
-        default:
-          return {
-            img: notification.image,
-            title: notification.title,
-            description: notification.message,
-            actions: []
-          }
-      }
-    })
+    const results = notification_index(notifications)
 
     res.status(200).json({
       success: true,

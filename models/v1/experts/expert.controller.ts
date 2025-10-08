@@ -4,7 +4,7 @@ import moment from 'moment-timezone'
 import { AuthenticatedRequest } from "@/middleware/verifyUsers";
 import { createZoomMeeting } from "@/utils/zoom.utils";
 import { expertScheduleQuerySchema, expertsQuerySchema } from "@/utils/queryValidation";
-import { accept_booking } from "@/utils/notification";
+import { accept_booking, cancel_booking } from "@/utils/notification";
 
 const prisma = new PrismaClient();
 
@@ -210,13 +210,6 @@ export const getExpertReviews = async (req: AuthenticatedRequest, res: Response)
     if (!id) {
       return res.status(400).json({ success: false, message: "Please provide expert ID." });
     }
-
-    // const expertProfile = await prisma.expertProfile.findUnique({ where: { id } });
-    // if (!expertProfile) {
-    //   return res.status(404).json({ success: false, message: "Expert not found." });
-    // }
-
-    // const userId = expertProfile.userId;
 
     const [totalReviews, reviews] = await Promise.all([
       prisma.review.count(),
@@ -450,13 +443,28 @@ export const acceptRejectBooking = async (req: AuthenticatedRequest, res: Respon
       newNotificationType = new_notification_type;
       newNotificationMessage = new_notification_message;
     } else {
-      newStatus = "CANCELLED";
-      refund_reason = "Cancelled The Meeting";
-      message = "Booking rejected successfully";
+      const payload = {
+        booking_id: booking.id,
+        expert: {
+          image: booking.expert.image,
+          name: booking.expert.name,
+        },
+        recipient_id: booking.student.id,
+        sender_id: booking.expert.id,
+        student: {
+          timezone: studentLocalTime,
+        },
+      };
 
-      updatedMetaTexts = ['Declined', 'Accept'];
-      newNotificationType = 'BOOKING_CANCELLED_BY_EXPERT';
-      newNotificationMessage = `Reject your consultation request on ${studentLocalTime}`;
+      const { new_message, new_notification_message, new_notification_type, new_status, refund_reason: RefundReason, updated_meta_texts } = await cancel_booking(payload)
+
+      newStatus = new_status;
+      refund_reason = RefundReason;
+      message = new_message;
+
+      updatedMetaTexts = updated_meta_texts;
+      newNotificationType = new_notification_type;
+      newNotificationMessage = new_notification_message;
     }
 
     // Common: update the original notification
