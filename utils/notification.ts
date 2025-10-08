@@ -153,6 +153,7 @@ export const index = (notifications: Notification[]) => {
             case 'REFUND_REVIEW':
                 // @ts-ignore
                 booking_id = notification.meta?.booking_id as string
+                const m: any = notification?.meta
                 return {
                     img: notification.image,
                     title: notification.title,
@@ -160,9 +161,10 @@ export const index = (notifications: Notification[]) => {
                     actions: [
                         {
                             bg_primary: true,
-                            text: notification.message,
+                            text: m.texts[0],
                             url: `/payments/bookings/${booking_id}/refunds/${notification.id}/review`,
-                            req_method: 'POST'
+                            req_method: 'POST',
+                            disabled: m.texts[0] === 'Confirmed' ? true : false
                         }
                     ]
                 }

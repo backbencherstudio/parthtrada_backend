@@ -268,7 +268,45 @@ export const confirmPayment = async (req: AuthenticatedRequest, res: Response) =
   }
 };
 
-export const refundReview = async (req: AuthenticatedRequest, res: Response) => { }
+export const refundReview = async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const notification_id = req.params.notification_id
+    const user_id = req.user.id
+    const notification = await prisma.notification.findUnique({
+      where: { id: notification_id, recipientId: user_id },
+      select: { meta: true },
+    });
+
+    if (!notification) throw new Error("Notification not found");
+
+    const currentMeta = (notification.meta && typeof notification.meta === 'object')
+      ? notification.meta
+      : {};
+
+    const payload = {
+      ...currentMeta,
+      disabled: true,
+      texts: ['Confirmed'],
+    }
+
+    await prisma.notification.update({
+      where: { id: notification_id },
+      data: {
+        meta: payload,
+      },
+    });
+    return res.status(201).json({
+      success: true,
+      message: 'Refund request reviewed successfully.',
+    })
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to confirm review refund request.",
+      error: "Internal server error",
+    });
+  }
+}
 
 export const transactions = async (req: AuthenticatedRequest, res: Response) => {
   try {
