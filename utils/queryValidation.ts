@@ -1,5 +1,5 @@
 import z from "zod";
-import { BookingStatus, Role } from "@prisma/client";
+import { BookingStatus, Role, PaymentStatus } from "@prisma/client";
 
 export const paginationQuerySchema = z.object({
     page: z
@@ -148,7 +148,7 @@ export const transactionsQuerySchema = z.object({
     search: z.string()
         .optional(),
     status: z
-        .nativeEnum(BookingStatus)
+        .nativeEnum(PaymentStatus)
         .nullable()
         .optional(),
 })

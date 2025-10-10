@@ -372,6 +372,7 @@ export const transactions = async (req: AuthenticatedRequest, res: Response) => 
             select: {
               id: true,
               amount: true,
+              status: true,
               createdAt: true,
               updatedAt: true
             }
@@ -382,7 +383,7 @@ export const transactions = async (req: AuthenticatedRequest, res: Response) => 
         orderBy: { updatedAt: "desc" },
       })
 
-      transactions = raw_transactions.map(item => ({ name: item.expert.name, status: item.status, refund_reason: item.refund_reason, ...item.transaction }))
+      transactions = raw_transactions.map(item => ({ ...item.transaction, name: item.expert.name, status: item.transaction.status, refund_reason: item.refund_reason, refunded: item.transaction.status === 'REFUNDED' }))
     } else {
       total = await prisma.booking.count({
         where: {
@@ -424,7 +425,7 @@ export const transactions = async (req: AuthenticatedRequest, res: Response) => 
         orderBy: { updatedAt: "desc" },
       })
 
-      transactions = raw_transactions.map(item => ({ name: item.student.name, refund_reason: item.refund_reason, ...item.transaction }))
+      transactions = raw_transactions.map(item => ({ name: item.student.name, refund_reason: item.refund_reason, refunded: item.transaction.status === 'REFUNDED', ...item.transaction }))
     }
 
     return res.status(200).json({

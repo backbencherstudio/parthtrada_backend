@@ -2,7 +2,7 @@ import { Request, Response } from "express";
 import { PrismaClient } from "@prisma/client";
 import { dashboardExpertsQuerySchema, sessionsQuerySchema, transactionsQuerySchema, usersQuerySchema } from "@/utils/queryValidation";
 import { AuthenticatedRequest } from "@/middleware/verifyUsers";
-import { adminProfileSchema, changeExpertStatus } from "@/utils/validations";
+import { adminPasswordSchema, adminProfileSchema, changeExpertStatus } from "@/utils/validations";
 import getDashboardStats from "@/utils/getDashboardStats";
 
 const prisma = new PrismaClient();
@@ -393,7 +393,7 @@ export const sessions = async (req: Request, res: Response): Promise<void> => {
       prisma.booking.findMany({
         skip,
         take: Number(perPage),
-        orderBy: { date: 'desc' },
+        orderBy: { updatedAt: 'desc' },
         where,
         include: {
           student: { select: { name: true, image: true } },
@@ -403,18 +403,32 @@ export const sessions = async (req: Request, res: Response): Promise<void> => {
       }),
     ]);
 
+    const latestSessions = sessions.map(session => ({
+      student: {
+        name: session.student?.name ?? null,
+        image: session.student?.image ?? null,
+      },
+      expert: {
+        name: session.expert?.name ?? null,
+        image: session.expert?.image ?? null,
+      },
+      sessionFee: session.transaction?.amount ?? session.expert?.expertProfile?.hourlyRate ?? null,
+      duration: session.sessionDuration,
+      date: session.date,
+      time: session.expertDateTime,
+      status: session.status,
+    }));
+
     res.json({
       success: true,
-      data: {
-        sessions,
-        pagination: {
-          total,
-          page,
-          perPage,
-          totalPages: Math.ceil(total / perPage),
-          hasNextPage: page * perPage < total,
-          hasPrevPage: page > 1,
-        },
+      data: latestSessions,
+      pagination: {
+        total,
+        page,
+        perPage,
+        totalPages: Math.ceil(total / perPage),
+        hasNextPage: page * perPage < total,
+        hasPrevPage: page > 1,
       },
     });
   } catch (error) {
@@ -433,7 +447,7 @@ export const transactions = async (req: Request, res: Response): Promise<void> =
     if (!query.success) {
       res.status(400).json({
         success: false,
-        message: "Invalid pagination parameters",
+        message: "Invalid query parameters",
         errors: query.error.flatten().fieldErrors,
       });
       return
@@ -444,7 +458,7 @@ export const transactions = async (req: Request, res: Response): Promise<void> =
 
     let where: any = {};
     if (status) {
-      where.booking = { status: status };
+      where = { status: status };
     }
     if (search) {
       where.AND = where.AND || [];
@@ -482,21 +496,19 @@ export const transactions = async (req: Request, res: Response): Promise<void> =
       date: tx.booking?.date ?? null,
       time: tx.booking?.expertDateTime ?? null, // or studentDateTime
       amount: tx.amount,
-      status: tx.booking?.status ?? null,
+      status: tx.status ?? null,
     }));
 
     res.json({
       success: true,
-      data: {
-        transactions: formattedTransactions,
-        pagination: {
-          total,
-          page,
-          perPage,
-          totalPages: Math.ceil(total / perPage),
-          hasNextPage: page * perPage < total,
-          hasPrevPage: page > 1,
-        },
+      data: formattedTransactions,
+      pagination: {
+        total,
+        page,
+        perPage,
+        totalPages: Math.ceil(total / perPage),
+        hasNextPage: page * perPage < total,
+        hasPrevPage: page > 1,
       },
     });
   } catch (error) {
@@ -507,7 +519,6 @@ export const transactions = async (req: Request, res: Response): Promise<void> =
     });
   }
 };
-
 
 export const dashboardRefundsList = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -582,13 +593,29 @@ export const updateProfile = async (req: AuthenticatedRequest, res: Response) =>
     if (!body.success) {
       res.status(400).json({
         success: false,
-        message: "Invalid query parameters",
+        message: "Invalid request data.",
         errors: body.error.flatten().fieldErrors,
       });
       return
     }
 
-    const { email, first_name, last_name, phone } = body.data
+    const { email, first_name, last_name, phone } = body.data;
+
+    if (email) {
+      const existingUser = await prisma.users.findFirst({
+        where: {
+          email,
+          NOT: { id: user_id },
+        },
+      });
+
+      if (existingUser) {
+        return res.status(400).json({
+          success: false,
+          message: "This email is already associated with another account.",
+        });
+      }
+    }
 
     const profile = await prisma.users.update({
       where: {
@@ -600,41 +627,83 @@ export const updateProfile = async (req: AuthenticatedRequest, res: Response) =>
       },
       select: {
         email: true,
-        phone: true
-      }
-    })
+        phone: true,
+      },
+    });
 
     const admin_profile = await prisma.adminProfile.upsert({
-      where: {
-        userId: user_id
-      },
+      where: { userId: user_id },
       update: {
-        first_name: first_name,
-        last_name
+        first_name,
+        last_name,
       },
       create: {
         userId: user_id,
         first_name,
         last_name,
-      }
-    })
+      },
+    });
 
-    res.status(200).json({
-      message: 'Profile updated successfully.',
+    return res.status(200).json({
+      success: true,
+      message: "Profile updated successfully.",
       data: {
         first_name: admin_profile.first_name,
         last_name: admin_profile.last_name,
         phone: profile.phone,
         email: profile.email,
-      }
-    })
-  } catch (error) {
-    res.status(500).json({
+      },
+    });
+  } catch (error: any) {
+    if (error.code === "P2002") {
+      return res.status(400).json({
+        success: false,
+        message: "Email already exists. Please use a different one.",
+      });
+    }
+
+    console.error("Update profile error:", error);
+
+    return res.status(500).json({
       success: false,
-      message: error instanceof Error ? error.message : "Internal server error",
+      message: "Something went wrong while updating your profile.",
+      error: error instanceof Error ? error.message : String(error),
     });
   }
-}
+};
+
+
+export const updatePassword = async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const user_id = req.user?.id
+
+    const body = adminPasswordSchema.safeParse(req.body);
+    if (!body.success) {
+      res.status(400).json({
+        success: false,
+        message: "Invalid request data.",
+        errors: body.error.flatten().fieldErrors,
+      });
+      return
+    }
+
+    const { confirm_password, new_password, old_password } = body.data;
+
+
+    return res.status(200).json({
+      success: true,
+      message: "Password updated successfully.",
+      data: {},
+    });
+  } catch (error: any) {
+    return res.status(500).json({
+      success: false,
+      message: "Something went wrong while updating your password.",
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+};
+
 
 export const expertById = async (req: Request, res: Response): Promise<any> => {
   try {

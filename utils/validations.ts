@@ -78,6 +78,29 @@ export const adminProfileSchema = z.object({
   email: z.string().email({ error: 'Invalid email address.' }).optional(),
 });
 
+export const adminPasswordSchema = z
+  .object({
+    old_password: z
+      .string("Old password is required.")
+      .min(6, "Old password must be at least 6 characters long."),
+
+    new_password: z
+      .string("New password is required.")
+      .min(8, "New password must be at least 8 characters long.")
+      .regex(
+        /^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[\W_]).+$/,
+        "New password must include uppercase, lowercase, number, and special character."
+      ),
+
+    confirm_password: z
+      .string("Confirm password is required.")
+      .min(8, "Confirm password must be at least 8 characters long."),
+  })
+  .refine((data) => data.new_password === data.confirm_password, {
+    message: "New password and confirm password do not match.",
+    path: ["confirm_password"],
+  });
+
 export const changeExpertStatus = z.object({
   status: z.enum(['ACTIVE', 'SUSPENDED']),
 });
