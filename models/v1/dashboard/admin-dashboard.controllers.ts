@@ -1,4 +1,5 @@
 import { Request, Response } from "express";
+import bcrypt from 'bcryptjs';
 import { PrismaClient } from "@prisma/client";
 import { dashboardExpertsQuerySchema, sessionsQuerySchema, transactionsQuerySchema, usersQuerySchema } from "@/utils/queryValidation";
 import { AuthenticatedRequest } from "@/middleware/verifyUsers";
@@ -672,7 +673,6 @@ export const updateProfile = async (req: AuthenticatedRequest, res: Response) =>
   }
 };
 
-
 export const updatePassword = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const user_id = req.user?.id
@@ -687,13 +687,33 @@ export const updatePassword = async (req: AuthenticatedRequest, res: Response) =
       return
     }
 
-    const { confirm_password, new_password, old_password } = body.data;
+    const { new_password, old_password } = body.data;
 
+    const user = await prisma.users.findUnique({
+      where: {
+        id: user_id
+      },
+      select: {
+        password: true
+      }
+    })
+
+    const isValidOldPassword = await bcrypt.compare(old_password, user.password);
+
+    if (!isValidOldPassword) {
+      res.status(400).json({ success: false, message: "old_password: The old password you entered is incorrect." });
+      return;
+    }
+
+    const hashedPassword = await bcrypt.hash(new_password, 10);
+    await prisma.users.update({
+      where: { id: user_id },
+      data: { password: hashedPassword },
+    });
 
     return res.status(200).json({
       success: true,
       message: "Password updated successfully.",
-      data: {},
     });
   } catch (error: any) {
     return res.status(500).json({
@@ -703,7 +723,6 @@ export const updatePassword = async (req: AuthenticatedRequest, res: Response) =
     });
   }
 };
-
 
 export const expertById = async (req: Request, res: Response): Promise<any> => {
   try {

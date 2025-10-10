@@ -5,6 +5,7 @@ import { AuthenticatedRequest } from "@/middleware/verifyUsers";
 import { cardSchema, confirmPaymentSchema, payoutsSchema, refundTransactionSchema } from "@/utils/validations";
 import stripe from "@/services/stripe";
 import { paginationQuerySchema } from "@/utils/queryValidation";
+import { io } from '@/socketServer';
 
 const prisma = new PrismaClient();
 
@@ -222,11 +223,14 @@ export const confirmPayment = async (req: AuthenticatedRequest, res: Response) =
           const expertTimezone = transaction.booking.expert.timezone;
           const expertLocalTime = moment.utc(transaction.booking.date).tz(expertTimezone)
 
+          const notification_title = transaction.booking.student.name
+          const  notification_message = `Wants to take your consultation on the ${expertLocalTime}`
+
           await prisma.notification.create({
             data: {
               image: transaction.booking.student.image,
-              title: transaction.booking.student.name,
-              message: `Wants to take your consultation on the ${expertLocalTime}`,
+              title: notification_title,
+              message: notification_message,
               type: 'BOOKING_REQUESTED',
               sender_id: transaction.booking.studentId,
               recipientId: transaction.booking.expertId,
@@ -237,6 +241,13 @@ export const confirmPayment = async (req: AuthenticatedRequest, res: Response) =
                 texts: ['Decline', 'Accept']
               }
             }
+          })
+
+          // Send notification
+          io.to(transaction.booking.expertId).emit('received-notification', {
+            image: transaction.booking.student.image,
+            title: notification_title,
+            message: notification_message
           })
         } else {
           throw new Error(`PaymentIntent not ready to capture. Status: ${updatedIntent.status}`);

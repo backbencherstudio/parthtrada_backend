@@ -48,6 +48,10 @@ io.on("connection", (socket) => {
     await createMessage({ content: message.content, recipientId: message.recipientId, user_id: message.user_id })
     io.to(message.recipientId).emit("new-message", message);
   });
+
+  socket.on('send-notification', async (notification) => {
+    socket.emit('received-notification', notification)
+  })
 });
 
 export { httpServer, io };

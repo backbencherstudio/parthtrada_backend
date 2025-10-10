@@ -6,6 +6,7 @@ import moment from 'moment-timezone'
 import { bookingSchema } from "@/utils/validations";
 import { bookingsQuerySchema, paginationQuerySchema, scheduleQuerySchema } from "@/utils/queryValidation";
 import calculateSlotAmount from "@/utils/calculate-slot-amount";
+import serializeBigInt from "@/utils/serializeBigInt";
 
 const prisma = new PrismaClient();
 
@@ -426,7 +427,7 @@ export const expertIndex = async (req: AuthenticatedRequest, res: Response): Pro
       },
       skip,
       take: perPage,
-      orderBy: { date: "desc" },
+      orderBy: { updatedAt: "desc" },
     });
 
     const modified = bookings.map(booking => ({
@@ -439,7 +440,7 @@ export const expertIndex = async (req: AuthenticatedRequest, res: Response): Pro
     res.status(200).json({
       success: true,
       message: "Bookings fetched successfully",
-      data: modified,
+      data: serializeBigInt(modified),
       pagination: {
         total,
         page,
@@ -451,6 +452,9 @@ export const expertIndex = async (req: AuthenticatedRequest, res: Response): Pro
     });
     return
   } catch (error) {
+    console.log('=============err from expert sc=======================');
+    console.log(error?.message);
+    console.log('====================================');
     res.status(500).json({
       success: false,
       message: "Failed to get bookings.",
@@ -538,4 +542,3 @@ export const capturePayment = async (req: AuthenticatedRequest, res: Response) =
     });
   }
 };
-
