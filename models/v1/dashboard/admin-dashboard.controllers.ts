@@ -596,7 +596,7 @@ export const updateProfile = async (req: AuthenticatedRequest, res: Response) =>
       },
       data: {
         email,
-        phone
+        phone,
       },
       select: {
         email: true,
