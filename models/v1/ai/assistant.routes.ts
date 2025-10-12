@@ -1,7 +1,8 @@
 import { Router } from 'express';
+import { search } from './assistant.controller';
 
 const router = Router()
 
-router.get("/assistant")
+router.get("/search", search)
 
-export default router
+export default router;

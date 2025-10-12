@@ -17,6 +17,7 @@ import s_webhookRoutes from './models/v1/stripe/webhook/webhook.routes'
 import notificationsRoutes from './models/v1/notifications/notifications.routes'
 import studentsRoutes from './models/v1/students/students.routes'
 import zoomRoutes from './models/v1/zoom/zoom.routes'
+import AIAssistantRoutes from './models/v1/ai/assistant.routes';
 
 const app = express();
 
@@ -57,6 +58,7 @@ app.use("/conversations", conversationsRoutes);
 app.use("/notifications", notificationsRoutes);
 app.use("/students", studentsRoutes);
 app.use("/zoom", zoomRoutes);
+app.use("/ai-assistant", AIAssistantRoutes);
 
 // For testing add ejs
 app.set("view engine", "ejs");
