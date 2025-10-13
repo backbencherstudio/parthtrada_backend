@@ -145,3 +145,31 @@ export const profileSchema = z.object({
 export const cardSchema = z.object({
   token: z.string(),
 })
+
+export const forgotPWSchema = z.object({
+  email: z.string().email({ error: 'Invalid email address.' }).min(1, { error: 'Email is required.' }),
+})
+
+export const verifyResetTokenSchema = z.object({
+  email: z.string().email({ error: 'Invalid email address.' }).min(1, { error: 'Email is required.' }),
+  otp: z.string('OTP is required.')
+})
+
+export const resetPasswordSchema = z.object({
+  email: z.string().email({ error: 'Invalid email address.' }).min(1, { error: 'Email is required.' }),
+  new_password: z
+    .string("New password is required.")
+    .min(8, "New password must be at least 8 characters long.")
+    .regex(
+      /^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[\W_]).+$/,
+      "New password must include uppercase, lowercase, number, and special character."
+    ),
+
+  confirm_password: z
+    .string("Confirm password is required.")
+    .min(8, "Confirm password must be at least 8 characters long."),
+})
+  .refine((data) => data.new_password === data.confirm_password, {
+    message: "New password and confirm password do not match.",
+    path: ["confirm_password"],
+  })

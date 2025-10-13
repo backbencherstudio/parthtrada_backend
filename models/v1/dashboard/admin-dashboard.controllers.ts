@@ -315,6 +315,7 @@ export const experts = async (req: Request, res: Response): Promise<void> => {
       });
       return {
         ...expert,
+        image: `/uploads/${expert.image}`,
         totalStudent: totalStudents.length,
         sessionFee: expertProfile.hourlyRate,
         totalSession: bookings,
@@ -623,7 +624,6 @@ export const updateProfile = async (req: AuthenticatedRequest, res: Response) =>
         id: user_id
       },
       data: {
-        email,
         phone,
       },
       select: {

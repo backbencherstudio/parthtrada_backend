@@ -9,7 +9,7 @@ import path from "path";
 import { v4 as uuidv4 } from "uuid";
 import { getImageUrl } from "../../../utils/base_utl";
 import { generateOTP, sendVerificationOTP } from "../../../utils/emailService.utils";
-import { loginSchema, registerSchema, updateUserSchema, verifyLoginSchema } from "@/utils/validations";
+import { forgotPWSchema, loginSchema, registerSchema, resetPasswordSchema, updateUserSchema, verifyLoginSchema, verifyResetTokenSchema } from "@/utils/validations";
 import stripe from "@/services/stripe";
 
 dotenv.config();
@@ -814,7 +814,7 @@ export const verifyOTP = async (req: Request, res: Response): Promise<void> => {
     if (!body.success) {
       res.status(400).json({
         success: false,
-        message: "Invalid query parameters",
+        message: "Invalid body parameters",
         errors: body.error.flatten().fieldErrors,
       });
       return
@@ -905,3 +905,169 @@ export const resendOTP = async (req: Request, res: Response): Promise<void> => {
   }
 }
 
+export const forgotPassword = async (req: Request, res: Response) => {
+  try {
+    const body = forgotPWSchema.safeParse(req.body);
+    if (!body.success) {
+      res.status(400).json({
+        success: false,
+        message: "Invalid body parameters",
+        errors: body.error.flatten().fieldErrors,
+      });
+      return
+    }
+
+    const { email } = body.data
+
+    const user = await prisma.users.findUnique({
+      where: {
+        email
+      }
+    })
+
+    if (!user) {
+      return res.status(400).json({
+        message: 'Bad request.'
+      })
+    }
+
+    const otp = generateOTP();
+
+    const new_otp = await prisma.ucode.upsert({
+      where: {
+        userId: user.id
+      },
+      update: {
+        otp: otp,
+        verified: false
+      },
+      create: {
+        email,
+        userId: user.id,
+        otp,
+        verified: false
+      }
+    })
+
+    await sendVerificationOTP(email, otp);
+
+    res.status(200).json({
+      success: true,
+      message: "Verify token sent successfully.",
+      data: {
+        otp: new_otp.otp
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error instanceof Error ? error.message : "Internal server error",
+    });
+  }
+}
+
+export const verifyResetToken = async (req: Request, res: Response) => {
+  try {
+    const { success, data, error } = verifyResetTokenSchema.safeParse(req.body)
+
+    if (!success) {
+      res.status(400).json({
+        success: false,
+        message: "Invalid body parameters",
+        errors: error.flatten().fieldErrors,
+      });
+      return
+    }
+
+    const user = await prisma.users.findUnique({
+      where: {
+        email: data.email
+      }
+    })
+    if (!user) {
+      return res.status(400).json({ success: false, message: "Invalid or expired token" });
+    }
+
+    const userCode = await prisma.ucode.findFirst({ where: { email: user.email } });
+    if (!userCode) {
+      res.status(401).json({ success: false, message: "Invalid or expired token" });
+      return;
+    }
+
+    if (userCode.otp !== data.otp) {
+      res.status(401).json({ success: false, message: "Invalid or expired token" });
+      return;
+    }
+
+    await prisma.ucode.update({
+      where: {
+        id: userCode.id
+      },
+      data: {
+        verified: true
+      }
+    })
+    return res.json({ success: true, message: "Verified OTP." })
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error instanceof Error ? error.message : "Internal server error",
+    });
+  }
+}
+
+export const resetPassword = async (req: Request, res: Response) => {
+  try {
+    const { success, data, error } = resetPasswordSchema.safeParse(req.body)
+
+    if (!success) {
+      res.status(400).json({
+        success: false,
+        message: "Invalid body parameters",
+        errors: error.flatten().fieldErrors,
+      });
+      return
+    }
+
+    const user = await prisma.users.findUnique({
+      where: {
+        email: data.email
+      },
+      select: {
+        id: true
+      }
+    })
+
+
+    if (!user) {
+      res.status(401).json({ success: false, message: "Invalid or expired token" });
+      return;
+    }
+
+    const uCode = await prisma.ucode.findUnique({
+      where: {
+        userId: user.id,
+        verified: true
+      }
+    })
+
+    if (!uCode) {
+      res.status(401).json({ success: false, message: "Invalid or expired token" });
+      return;
+    }
+
+    const hashedPassword = await bcrypt.hash(data.new_password, 10);
+    await prisma.users.update({
+      where: { id: user.id },
+      data: { password: hashedPassword },
+    });
+
+
+    return res.json({ success: true, message: "Password update successfully." })
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error instanceof Error ? error.message : "Internal server error",
+    });
+  }
+}

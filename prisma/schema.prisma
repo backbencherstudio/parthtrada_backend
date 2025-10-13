@@ -15,6 +15,7 @@ model Ucode {
   updatedAt    DateTime @updatedAt
   otp          String?
   email        String?
+  verified     Boolean? @default(false)
   userId       String   @unique
   user         Users    @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
@@ -264,7 +265,6 @@ enum NotificationType {
   SESSION_STARTED
   SYSTEM_ALERT
 }
-
 
 enum ExpertProfileStatus {
   ACTIVE
