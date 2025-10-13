@@ -1,6 +1,5 @@
 import type { Request, Response } from "express";
 import { Prisma, PrismaClient } from "@prisma/client";
-import moment from 'moment-timezone'
 import { AuthenticatedRequest } from "@/middleware/verifyUsers";
 import { createZoomMeeting } from "@/utils/zoom.utils";
 import { expertScheduleQuerySchema, expertsQuerySchema } from "@/utils/queryValidation";
@@ -24,6 +23,7 @@ export const index = async (req: Request, res: Response) => {
     const skip = (page - 1) * perPage;
 
     const where: Prisma.ExpertProfileWhereInput = {
+      isOnboardCompleted: true,
       ...(name
         ? {
           user: {

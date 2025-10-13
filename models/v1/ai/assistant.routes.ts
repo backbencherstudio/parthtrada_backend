@@ -1,8 +1,9 @@
 import { Router } from 'express';
 import { search } from './assistant.controller';
+import { verifyUser } from '@/middleware/verifyUsers';
 
 const router = Router()
 
-router.get("/search", search)
+router.get("/search", verifyUser('ANY'), search)
 
 export default router;
