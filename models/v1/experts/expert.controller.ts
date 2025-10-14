@@ -4,6 +4,7 @@ import { AuthenticatedRequest } from "@/middleware/verifyUsers";
 import { createZoomMeeting } from "@/utils/zoom.utils";
 import { expertScheduleQuerySchema, expertsQuerySchema } from "@/utils/queryValidation";
 import { accept_booking, cancel_booking } from "@/utils/notification";
+import { getTimeRange, groupDays, normalizeTimeArray } from "@/utils/availability";
 
 const prisma = new PrismaClient();
 
@@ -166,6 +167,11 @@ export const getExpertById = async (req: Request, res: Response) => {
 
     const totalStudents = studentCount.length;
 
+    const result = {
+      availableDays: groupDays(expert.availableDays),
+      availableTime: getTimeRange(expert.availableTime)
+    };
+
     return res.status(200).json({
       success: true,
       message: "Expert fetched successfully.",
@@ -179,6 +185,10 @@ export const getExpertById = async (req: Request, res: Response) => {
           experience: expert.experience,
           hourlyRate: expert.hourlyRate,
           skills: expert.skills,
+          availability: {
+            days: normalizeTimeArray(result).availableDays,
+            time: normalizeTimeArray(result).availableTime,
+          },
           availableDays: expert.availableDays,
           availableTime: expert.availableTime,
           user: expert.user,
