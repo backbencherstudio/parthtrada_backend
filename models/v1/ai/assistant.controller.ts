@@ -6,9 +6,6 @@ const prisma = new PrismaClient()
 export const search = async (req: Request, res: Response) => {
     try {
         const search_query = req.query?.q || ''
-        console.log('===============search_query=====================');
-        console.log(search_query);
-        console.log('====================================');
         const experts = await prisma.expertProfile.findMany()
         const response = await fetch(
             'https://openrouter.ai/api/v1/chat/completions',
@@ -43,9 +40,6 @@ Answer clearly using only this information.
         const data = await response.json()
 
         if (data.error) {
-            console.log('=========got error from route -> /ai-assistant/search===========================');
-            console.log(data.error);
-            console.log('====================================');
             return res.status(500).json({
                 success: false,
                 message: 'Something went wrong.'

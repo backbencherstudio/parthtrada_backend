@@ -429,8 +429,35 @@ export const expertIndex = async (req: AuthenticatedRequest, res: Response): Pro
       take: perPage,
       orderBy: { updatedAt: "desc" },
     });
+    const notifications = [];
+    for (const booking of bookings) {
+      const notification = await prisma.notification.findFirst({
+        where: {
+          AND: [
+            { meta: { path: ['booking_id'], equals: booking.id } },
+            { meta: { path: ['disabled'], equals: false } },
+          ],
+        },
+      });
 
-    const modified = bookings.map(booking => ({
+      if (notification) {
+        notifications.push({
+          bookingId: booking.id,
+          notification,
+        });
+      }
+    }
+
+
+    const merged = bookings.map((booking) => {
+      const notification = notifications.find((n) => n.bookingId === booking.id);
+      return {
+        ...booking,
+        notification_id: notification?.notification?.id || null,
+      };
+    });
+
+    const modified = merged.map(booking => ({
       ...booking,
       review: null,
       should_review: null,

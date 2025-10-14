@@ -659,9 +659,16 @@ export const expertSchedule = async (req: AuthenticatedRequest, res: Response) =
         student: true,
       },
     });
+
+    const bookingsWithFuckingNotification = bookings.map(booking => ({
+      ...booking,
+      notification_id: 'fuck'
+    }))
+
     res.status(200).json({
       success: true,
       message: "Schedule fetched successfully",
+      bookingsWithFuckingNotification,
       data: bookings,
       pagination: {
         total,
