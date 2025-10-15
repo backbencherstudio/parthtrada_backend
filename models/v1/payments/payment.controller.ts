@@ -224,7 +224,7 @@ export const confirmPayment = async (req: AuthenticatedRequest, res: Response) =
           const expertLocalTime = moment.utc(transaction.booking.date).tz(expertTimezone)
 
           const notification_title = transaction.booking.student.name
-          const  notification_message = `Wants to take your consultation on the ${expertLocalTime}`
+          const notification_message = `Wants to take your consultation on the ${expertLocalTime}`
 
           await prisma.notification.create({
             data: {
@@ -531,45 +531,51 @@ export const refundTransaction = async (req: AuthenticatedRequest, res: Response
 };
 
 export const payouts = async (req: AuthenticatedRequest, res: Response) => {
-  const { data, error, success } = payoutsSchema.safeParse(req.body);
-  if (!success) {
-    if (!success) {
-      return res.status(400).json({
-        success: false,
-        errors: JSON.parse(error.message).map(err => ({
-          field: err.path.join("."),
-          message: err.message,
-        })),
-      });
-    }
-  }
-  try {
-    const userID = req.user?.id
-    const expert = await prisma.expertProfile.findFirst({ where: { userId: userID } })
+  const { success, data, error } = payoutsSchema.safeParse(req.body);
 
-    const stripeAccount = expert?.stripeAccountId
+  if (!success) {
+    return res.status(400).json({
+      success: false,
+      errors: JSON.parse(error.message).map(err => ({
+        field: err.path.join("."),
+        message: err.message,
+      })),
+    });
+  }
+
+  try {
+    const userID = req.user?.id;
+    const expert = await prisma.expertProfile.findFirst({
+      where: { userId: userID },
+    });
+
+    const stripeAccount = expert?.stripeAccountId;
 
     if (!stripeAccount) {
-      res.status(404).json({
-        message: 'Please connect your stripe account first'
-      })
-      return
+      return res.status(404).json({
+        success: false,
+        message: "Please connect your stripe account first",
+      });
     }
 
-    await stripe.payouts.create(
+    const payout = await stripe.payouts.create(
       {
         amount: data.amount * 100,
         currency: "usd",
       },
-      {
-        stripeAccount: stripeAccount
-      }
+      { stripeAccount }
     );
 
-
-    return res.status(200).json({ message: 'Payout created successfully.', data: {} });
-  } catch (error) {
-    return res.status(400).json({ error: error.message });
+    return res.status(200).json({
+      success: true,
+      message: "Payout created successfully.",
+      data: payout,
+    });
+  } catch (error: any) {
+    return res.status(400).json({
+      success: false,
+      message: error.message || "Error creating payout",
+    });
   }
 };
 
@@ -592,7 +598,10 @@ export const balance = async (req: AuthenticatedRequest, res: Response) => {
     });
 
     res.status(200).json({
-      data: balance
+      data: {
+        amount: balance.available[0].amount / 100,
+        currency: balance.available[0].currency
+      }
     })
     return
   } catch (error) {
