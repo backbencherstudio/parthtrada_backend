@@ -4,6 +4,6 @@ import { verifyUser } from '@/middleware/verifyUsers';
 
 const router = Router()
 
-router.get("/search", verifyUser('ANY'), search)
+router.get("/search", search)
 
 export default router;

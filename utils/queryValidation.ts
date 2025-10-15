@@ -53,7 +53,7 @@ export const expertsQuerySchema = z.object({
         .default('10')
         .transform(val => parseInt(val, 10))
         .refine(val => val > 0, { message: 'PerPage must be greater than 0' }),
-    name: z.string()
+    q: z.string()
         .optional(),
     skills: z.string()
         .optional(),

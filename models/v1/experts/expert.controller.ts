@@ -5,57 +5,107 @@ import { createZoomMeeting } from "@/utils/zoom.utils";
 import { expertScheduleQuerySchema, expertsQuerySchema } from "@/utils/queryValidation";
 import { accept_booking, cancel_booking } from "@/utils/notification";
 import { getTimeRange, groupDays, normalizeTimeArray } from "@/utils/availability";
+import AIRequest from "@/services/aiService";
 
 const prisma = new PrismaClient();
 
+const format_data = (text: string) => {
+  if (!text) return [];
+
+  try {
+    const parsed = JSON.parse(text);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
 export const index = async (req: Request, res: Response) => {
   try {
-    const result = expertsQuerySchema.safeParse(req.query);
-    if (!result.success) {
+    const query = expertsQuerySchema.safeParse(req.query);
+    if (!query.success) {
       res.status(400).json({
         success: false,
-        message: "Invalid query parameters",
-        errors: result.error.flatten().fieldErrors,
+        message: 'Invalid query parameters',
+        errors: query.error.flatten().fieldErrors,
       });
-      return
+      return;
     }
 
-    const { page, perPage, name } = result.data;
-    const skip = (page - 1) * perPage;
+    const { page = 1, perPage = 10, q, skills } = query.data;
+    const skip = (Number(page) - 1) * Number(perPage);
 
     const where: Prisma.ExpertProfileWhereInput = {
       isOnboardCompleted: true,
-      ...(name
-        ? {
-          user: {
-            name: {
-              contains: name,
-              mode: "insensitive",
-            },
-          },
-        }
-        : {}),
     };
 
-    if (result.data.skills) {
-      const skillsArray = (result.data.skills as string)
+    if (skills) {
+      const skillsArray = (skills as string)
         .split(',')
         .map(s => s.trim())
         .filter(s => s);
-      where.skills = { hasSome: skillsArray, };
+      where.skills = { hasSome: skillsArray };
     }
 
-    const andConditions: Prisma.ExpertProfileWhereInput[] = [];
+    // AI search branch
+    if (q && String(q).trim() !== '') {
+      const experts = await prisma.expertProfile.findMany({ where });
 
-    if (andConditions.length > 0) {
-      where.AND = andConditions;
+      const prompt = `
+User asked: "${q}".
+Here are top results from DB: ${JSON.stringify(experts)}.
+
+Return a JSON array of the most relevant experts based on the user query.
+Each object must follow this structure:
+[
+      {
+            "id": string,
+            "profession": string,
+            "organization": string,
+            "location": string,
+            "description": string,
+            "experience": string,
+            "hourlyRate": number,
+            "skills": string[],
+            "availableDays": string[],
+            "availableTime": string[],
+            "status": string,
+            "stripeAccountId": string,
+            "isOnboardCompleted": boolean,
+            "userId": string
+        }
+]
+Only return valid JSON — no explanations.
+`;
+
+      const ai_response = await AIRequest(prompt);
+      const formatted = format_data(ai_response);
+
+      const total = formatted.length;
+      const paginated = formatted.slice(skip, skip + Number(perPage));
+
+      return res.status(200).json({
+        success: true,
+        message: 'Experts fetched successfully.',
+        data: paginated,
+        pagination: {
+          total,
+          page: Number(page),
+          perPage: Number(perPage),
+          totalPages: Math.ceil(total / Number(perPage)),
+          hasNextPage: Number(page) * Number(perPage) < total,
+          hasPrevPage: Number(page) > 1,
+        },
+      });
     }
 
+    // Normal expert listing with pagination & ratings
     const total = await prisma.expertProfile.count({ where });
     const data = await prisma.expertProfile.findMany({
       where,
       skip,
-      include: { user: { select: { name: true, email: true, image: true } } }
+      take: Number(perPage),
+      include: { user: { select: { name: true, email: true, image: true } } },
     });
 
     const expertIds = data.map(expert => expert.userId);
@@ -63,7 +113,7 @@ export const index = async (req: Request, res: Response) => {
       by: ['expertId'],
       where: { expertId: { in: expertIds } },
       _avg: { rating: true },
-      _count: { rating: true }
+      _count: { rating: true },
     });
 
     const ratingsMap = Object.fromEntries(
@@ -72,32 +122,31 @@ export const index = async (req: Request, res: Response) => {
 
     const dataWithRatings = data.map(expert => ({
       ...expert,
-      rating: ratingsMap[expert.userId] ?? { avg: 0, total: 0 }
+      rating: ratingsMap[expert.userId] ?? { avg: 0, total: 0 },
     }));
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       message: 'Experts fetched successfully.',
       data: dataWithRatings,
       pagination: {
         total,
-        page,
-        perPage,
-        totalPages: Math.ceil(total / perPage),
-        hasNextPage: page * perPage < total,
-        hasPrevPage: page > 1,
+        page: Number(page),
+        perPage: Number(perPage),
+        totalPages: Math.ceil(total / Number(perPage)),
+        hasNextPage: Number(page) * Number(perPage) < total,
+        hasPrevPage: Number(page) > 1,
       },
-    })
-  } catch (error) {
-    console.error('Error getting experts:', error?.message)
-    res.status(500).json({
-      success: false,
-      message: "Failed to get experts.",
-      error: error instanceof Error ? error.message : "Internal server error",
     });
-    return
+  } catch (error: any) {
+    console.error('Error getting experts:', error?.message);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to get experts.',
+      error: error instanceof Error ? error.message : 'Internal server error',
+    });
   }
-}
+};
 
 export const getExpertById = async (req: Request, res: Response) => {
   try {

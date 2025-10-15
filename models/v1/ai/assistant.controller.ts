@@ -1,5 +1,17 @@
 import { PrismaClient } from '@prisma/client'
 import { Request, Response } from 'express'
+import AIRequest from '@/services/aiService'
+
+const format_data = (text: string) => {
+    if (!text) return [];
+
+    try {
+        const parsed = JSON.parse(text);
+        return Array.isArray(parsed) ? parsed : [];
+    } catch {
+        return [];
+    }
+}
 
 const prisma = new PrismaClient()
 
@@ -7,52 +19,47 @@ export const search = async (req: Request, res: Response) => {
     try {
         const search_query = req.query?.q || ''
         const experts = await prisma.expertProfile.findMany()
-        const response = await fetch(
-            'https://openrouter.ai/api/v1/chat/completions',
-            {
-                method: 'POST',
-                headers: {
-                    Authorization:
-                        'Bearer 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',
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    model: 'deepseek/deepseek-r1:free',
-                    messages: [
-                        {
-                            role: 'system',
-                            content:
-                                'You are a helpful assistant answering from the database.'
-                        },
-                        {
-                            role: 'user',
-                            content: `
+
+        const prompt = `
 User asked: "${search_query}".
-Here are top results from the DB: ${JSON.stringify(experts)}.
-Answer clearly using only this information.
-      `
-                        }
-                    ]
-                })
-            }
-        )
+Here are top results from DB: ${JSON.stringify(experts)}.
 
-        const data = await response.json()
-
-        if (data.error) {
-            return res.status(500).json({
-                success: false,
-                message: 'Something went wrong.'
-            })
+Return a JSON array of the most relevant experts based on the user query.
+Each object must follow this structure:
+[
+      {
+            "id": string,
+            "profession": string,
+            "organization": string,
+            "location": string,
+            "description": string,
+            "experience": string,
+            "hourlyRate": number,
+            "skills": string[],
+            "availableDays": string[],
+            "availableTime": string[],
+            "status": string,
+            "stripeAccountId": string,
+            "isOnboardCompleted": boolean,
+            "userId": string
         }
+]
+Only return valid JSON — no explanations.
+`;
+
+        const ai_response = await AIRequest(prompt)
+
+        if (!ai_response) return [];
 
         return res.status(200).json({
             success: true,
             message: 'Search result.',
-            search_query,
-            data: data
+            data: format_data(ai_response),
         })
     } catch (error) {
+        console.log('===========error=========================');
+        console.log(error?.message);
+        console.log('====================================');
         res.status(500).json({
             success: false,
             message: 'Failed to search query.',
