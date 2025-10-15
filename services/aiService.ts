@@ -1,7 +1,7 @@
 import { Groq } from 'groq-sdk';
 
 const groq = new Groq({
-    apiKey: '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',
+    apiKey: process.env.GROK_API_KEY,
 });
 
 export default async function AIRequest(prompt: string) {
@@ -30,10 +30,6 @@ export default async function AIRequest(prompt: string) {
             result += content;
         }
     }
-
-    console.log('============result.trim()========================');
-    console.log(result.trim());
-    console.log('====================================');
 
     return result.trim();
 }
