@@ -16,6 +16,10 @@ export const handleWebhook = async (req, res) => {
         return res.status(400).send(`Webhook Error: ${err.message}`);
     }
 
+    console.log('=========event type===========================');
+    console.log(event.type);
+    console.log('====================================');
+
     try {
         switch (event.type) {
             case 'payment_intent.succeeded':
@@ -63,10 +67,12 @@ export const handleWebhook = async (req, res) => {
                         }
                     })
                 } catch (error) {
-                    console.log('=============error from stripe webhook refund.updated=======================');
-                    console.error(error?.message);
-                    console.log('====================================');
                 }
+                break;
+            case 'payout.created':
+                console.log('================payout.created====================');
+                console.log(event.data.object);
+                console.log('====================================');
                 break;
             default:
                 console.log('=================================================================================');

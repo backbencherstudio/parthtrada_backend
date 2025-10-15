@@ -49,7 +49,7 @@ export const index = async (req: Request, res: Response) => {
 
     // AI search branch
     if (q && String(q).trim() !== '') {
-      const experts = await prisma.expertProfile.findMany({ where });
+      const experts = await prisma.expertProfile.findMany({ where, include: { user: { select: { name: true, email: true, image: true } } } });
 
       const prompt = `
 User asked: "${q}".
@@ -72,7 +72,12 @@ Each object must follow this structure:
             "status": string,
             "stripeAccountId": string,
             "isOnboardCompleted": boolean,
-            "userId": string
+            "userId": string,
+            "user": {
+                "name": string,
+                "email": string,
+                "image": string | null
+            },
         }
 ]
 Only return valid JSON — no explanations.
@@ -88,6 +93,7 @@ Only return valid JSON — no explanations.
         success: true,
         message: 'Experts fetched successfully.',
         data: paginated,
+        experts,
         pagination: {
           total,
           page: Number(page),

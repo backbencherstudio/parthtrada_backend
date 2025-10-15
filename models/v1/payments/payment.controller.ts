@@ -322,126 +322,155 @@ export const refundReview = async (req: AuthenticatedRequest, res: Response) => 
 export const transactions = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const query = paginationQuerySchema.safeParse(req.query);
-    const user_id = req.user?.id
+    const user_id = req.user?.id;
 
     if (!query.success) {
-      res.status(400).json({
+      return res.status(400).json({
         success: false,
         message: "Invalid pagination parameters",
         errors: query.error.flatten().fieldErrors,
       });
-      return
     }
 
     const { page, perPage } = query.data;
     const skip = (page - 1) * perPage;
 
     const user = await prisma.users.findUnique({
-      where: {
-        id: user_id
-      }
-    })
+      where: { id: user_id },
+    });
 
     if (!user) {
       return res.status(404).json({
         success: false,
-        message: 'User not found.'
-      })
+        message: "User not found.",
+      });
     }
 
     const user_type = user.activeProfile;
-    let transactions = [];
+    let transactions: any[] = [];
     let total = 0;
 
-    if (user_type === 'STUDENT') {
+    // 🧑‍🎓 STUDENT Transactions
+    if (user_type === "STUDENT") {
       total = await prisma.booking.count({
         where: {
-          studentId: user_id, transaction: {
-            status: { in: ['COMPLETED', 'REFUNDED'] }
-          }
-        }
+          studentId: user_id,
+          transaction: {
+            status: { in: ["COMPLETED", "REFUNDED"] },
+          },
+        },
       });
+
       const raw_transactions = await prisma.booking.findMany({
         where: {
           studentId: user_id,
-          status: {
-            notIn: ['PENDING']
-          }
+          transaction: {
+            status: { in: ["COMPLETED", "REFUNDED"] },
+          },
         },
         select: {
           status: true,
           refund_reason: true,
-          expert: {
-            select: {
-              name: true
-            }
-          },
+          expert: { select: { name: true } },
           transaction: {
-            where: {
-              status: { in: ['COMPLETED', 'REFUNDED'] }
-            },
+            where: { status: { in: ["COMPLETED", "REFUNDED"] } },
             select: {
               id: true,
               amount: true,
               status: true,
               createdAt: true,
-              updatedAt: true
-            }
-          }
+              updatedAt: true,
+            },
+          },
         },
         skip,
         take: perPage,
         orderBy: { updatedAt: "desc" },
-      })
-
-      transactions = raw_transactions.map(item => ({ ...item.transaction, name: item.expert.name, status: item.transaction.status, refund_reason: item.refund_reason, refunded: item.transaction.status === 'REFUNDED' }))
-    } else {
-      total = await prisma.booking.count({
-        where: {
-          expertId: user_id,
-          transaction: {
-            status: { in: ['COMPLETED', 'REFUNDED'] }
-          }
-        }
       });
-      const raw_transactions = await prisma.booking.findMany({
+
+      transactions = raw_transactions.map((item) => ({
+        name: item.expert.name,
+        refund_reason: item.refund_reason,
+        refunded: item.transaction?.status === "REFUNDED",
+        withdraw: false, // ✅ always false for students
+        ...item.transaction,
+      }));
+    }
+
+    // 👨‍🏫 EXPERT Transactions
+    else {
+      // 1️⃣ Booking-related transactions
+      const bookingTransactions = await prisma.booking.findMany({
         where: {
           expertId: user_id,
           transaction: {
-            status: { in: ['COMPLETED', 'REFUNDED'] }
-          }
+            status: { in: ["COMPLETED", "REFUNDED"] },
+          },
         },
         select: {
           refund_reason: true,
-          student: {
-            select: {
-              name: true
-            }
-          },
+          student: { select: { name: true } },
           transaction: {
-            where: {
-              status: { in: ['COMPLETED', 'REFUNDED'] }
-            },
+            where: { status: { in: ["COMPLETED", "REFUNDED"] } },
             select: {
               id: true,
-              status: true,
               amount: true,
+              status: true,
               createdAt: true,
-              updatedAt: true
-            }
-          }
+              updatedAt: true,
+            },
+          },
         },
-        skip,
-        take: perPage,
-        orderBy: { updatedAt: "desc" },
-      })
+      });
 
-      transactions = raw_transactions.map(item => ({ name: item.student.name, refund_reason: item.refund_reason, refunded: item.transaction.status === 'REFUNDED', ...item.transaction }))
+      const bookingFormatted = bookingTransactions.map((item) => ({
+        name: item.student.name,
+        refund_reason: item.refund_reason,
+        refunded: item.transaction?.status === "REFUNDED",
+        withdraw: false, // ✅ booking payments = false
+        ...item.transaction,
+      }));
+
+      const payoutTransactions = await prisma.transaction.findMany({
+        where: {
+          bookingId: null, // no booking attached
+          userId: user_id,
+          status: { in: ["COMPLETED", "REFUNDED"] },
+        },
+        select: {
+          id: true,
+          amount: true,
+          status: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      });
+
+      const payoutFormatted = payoutTransactions.map((tx) => ({
+        name: "Payout",
+        refund_reason: null,
+        refunded: tx.status === "REFUNDED",
+        withdraw: true, // ✅ mark payouts as withdrawals
+        ...tx,
+      }));
+
+      // Merge both
+      transactions = [...bookingFormatted, ...payoutFormatted];
+
+      // Sort newest first
+      transactions.sort(
+        (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+      );
+
+      total = transactions.length;
+
+      // Manual pagination
+      transactions = transactions.slice(skip, skip + perPage);
     }
 
     return res.status(200).json({
       success: true,
-      message: 'Transactions fetched successfully.',
+      message: "Transactions fetched successfully.",
       data: transactions,
       pagination: {
         total,
@@ -451,15 +480,18 @@ export const transactions = async (req: AuthenticatedRequest, res: Response) => 
         hasNextPage: page * perPage < total,
         hasPrevPage: page > 1,
       },
-    })
-  } catch (error) {
-    res.status(500).json({
+    });
+  } catch (error: any) {
+    console.error(error);
+    return res.status(500).json({
       success: false,
       message: "Failed to fetch transactions",
-      error: "Internal server error",
+      error: error.message || "Internal server error",
     });
   }
-}
+};
+
+
 
 export const refundTransaction = async (req: AuthenticatedRequest, res: Response) => {
   try {
@@ -565,6 +597,19 @@ export const payouts = async (req: AuthenticatedRequest, res: Response) => {
       },
       { stripeAccount }
     );
+
+    if (payout.status === 'pending') {
+      await prisma.transaction.create({
+        data: {
+          userId: userID,
+          amount: data.amount,
+          currency: 'usd',
+          provider: "STRIPE",
+          providerId: payout.id,
+          status: "COMPLETED",
+        },
+      });
+    }
 
     return res.status(200).json({
       success: true,
