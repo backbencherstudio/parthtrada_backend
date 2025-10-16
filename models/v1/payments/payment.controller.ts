@@ -203,7 +203,7 @@ export const confirmPayment = async (req: AuthenticatedRequest, res: Response) =
           const payment_method = await prisma.paymentMethod.findFirst({
             where: {
               userId: userId,
-              default: true
+              method_id: data.paymentIntentId
             }
           })
           // Attach and confirm payment method
