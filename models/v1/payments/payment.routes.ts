@@ -17,7 +17,7 @@ router.post('/bookings/:booking_id/refunds/:notification_id/review', verifyUser(
 
 // expert routes
 router.post("/experts/refund", verifyUser("EXPERT"), refundTransaction);
-router.get("/experts/balance", verifyUser("EXPERT"), balance);
+router.get("/experts/balance", verifyUser("ANY"), balance);
 router.post("/experts/payouts", verifyUser("EXPERT"), payouts);
 
 // Stripe Connect routes

@@ -29,6 +29,13 @@ export const create = async (req: AuthenticatedRequest, res: Response) => {
       });
     }
 
+    if (userId === data.expertId) {
+      return res.status(400).json({
+        success: false,
+        message: "You cannot create a booking for yourself.",
+      })
+    }
+
     // Check if expert has completed Stripe onboarding
     const expert = await prisma.expertProfile.findUnique({
       where: { userId: data.expertId },
@@ -71,7 +78,7 @@ export const create = async (req: AuthenticatedRequest, res: Response) => {
       }
     });
 
-    const amount = calculateSlotAmount(expert.hourlyRate, data.sessionDuration)
+    const amount = Number(calculateSlotAmount(expert.hourlyRate, data.sessionDuration).toFixed(2))
     const amountInCents = Math.round(amount * 100);
     const platformFee = Math.round(amountInCents * 0.1);
 
@@ -97,6 +104,7 @@ export const create = async (req: AuthenticatedRequest, res: Response) => {
       data: {
         bookingId: booking.id,
         amount: amount,
+        type: 'order',
         currency: data.currency,
         provider: "STRIPE",
         providerId: paymentIntent.id,

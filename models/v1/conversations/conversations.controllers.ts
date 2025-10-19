@@ -236,9 +236,12 @@ export const sendMessage = async (req: AuthenticatedRequest, res: Response) => {
 
   try {
 
-    const message = createMessage({ content, recipientId: recipient.id, user_id })
+    const message = await createMessage({ content, recipientId: recipient.id, user_id })
 
-    return res.status(201).json(message);
+    return res.status(201).json({
+      success: true,
+      data: message
+    });
   } catch (err: any) {
     console.error(err);
     return res.status(500).json({ error: err.message || "Internal error" });
