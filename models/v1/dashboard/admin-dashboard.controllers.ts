@@ -211,6 +211,66 @@ export const users = async (req: Request, res: Response): Promise<void> => {
     });
   }
 };
+export const me = async (req: any, res: Response) => {
+  try {
+    if (!req.user?.id) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized.",
+      });
+    }
+
+    // Dynamically select profile based on activeProfile
+    const includeProfile =
+      req.user.activeProfile === "STUDENT"
+        ? { studentProfile: true }
+        : { expertProfile: true };
+
+    const user = await prisma.users.findUnique({
+      where: { id: req.user.id },
+      select: {
+        id: true,
+        linkedin_id: true,
+        name: true,
+        email: true,
+        lastLogin: true,
+        image: true,
+        activeProfile: true,
+        timezone: true,
+        createdAt: true,
+        updatedAt: true,
+        ...includeProfile,
+      },
+    });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found.",
+      });
+    }
+
+    // Shape response data
+    const { studentProfile, expertProfile, ...baseData } = user;
+    const data = {
+      ...baseData,
+      meta: req.user.activeProfile === "STUDENT" ? studentProfile : expertProfile,
+    };
+
+    return res.status(200).json({
+      success: true,
+      message: "Authenticated.",
+      data,
+    });
+  } catch (error) {
+    console.error("Error fetching authenticated profile:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to get authenticated profile.",
+      error: error instanceof Error ? error.message : "Internal server error",
+    });
+  }
+};
 
 export const userById = async (req: Request, res: Response): Promise<any> => {
   try {
