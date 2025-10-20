@@ -102,6 +102,7 @@ export const create = async (req: AuthenticatedRequest, res: Response) => {
 
     await prisma.transaction.create({
       data: {
+        userId: userId,
         bookingId: booking.id,
         amount: amount,
         type: 'order',
@@ -112,7 +113,7 @@ export const create = async (req: AuthenticatedRequest, res: Response) => {
       },
     });
 
-    return res.json({
+    return res.status(201).json({
       success: true,
       message: "Booking Request sent successfully",
       data: {
@@ -202,7 +203,7 @@ export const index = async (
 };
 
 export const cancelBooking = async (req: AuthenticatedRequest,
-  res: Response): Promise<void> => {
+  res: Response): Promise<any> => {
   try {
     const booking_id = req.params.id
     const student_id = req.user?.id
@@ -210,6 +211,16 @@ export const cancelBooking = async (req: AuthenticatedRequest,
       where: {
         id: booking_id,
         studentId: student_id
+      },
+      select: {
+        id: true,
+        status: true,
+        transaction: {
+          select: {
+            amount: true,
+            status: true
+          }
+        }
       }
     })
 
@@ -220,17 +231,43 @@ export const cancelBooking = async (req: AuthenticatedRequest,
       })
     }
 
+    if (booking.status === "CANCELLED") {
+      return res.status(400).json({
+        success: false,
+        message: "This booking is already cancelled."
+      });
+    }
+
+    if (booking.transaction?.status !== "COMPLETED") {
+      return res.status(400).json({
+        success: false,
+        message: "You can only cancel bookings with a completed transaction."
+      });
+    }
+
     const updated_data = await prisma.booking.update({
       where: {
         id: booking_id,
       },
       data: {
-        status: 'CANCELLED',
-        refund_reason: 'Cancelled The Meeting'
+        status: "CANCELLED",
+        refund_reason: "Cancelled the meeting."
       }
-    })
+    });
 
-    res.status(200).json({
+    await prisma.transaction.create({
+      data: {
+        userId: student_id,
+        amount: booking.transaction.amount,
+        type: 'refund-request',
+        currency: 'usd',
+        provider: "STRIPE",
+        providerId: booking.id,
+        status: "PENDING",
+      },
+    });
+
+    return res.status(200).json({
       success: true,
       message: "Booking cancelled successfully.",
       data: updated_data

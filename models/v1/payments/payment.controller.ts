@@ -207,6 +207,12 @@ export const confirmPayment = async (req: AuthenticatedRequest, res: Response) =
               method_id: data.paymentMethodId
             }
           })
+          if (!payment_method) {
+            return res.status(400).json({
+              success: false,
+              message: 'Payment method not correct.'
+            })
+          }
           // Attach and confirm payment method
           confirm_payment = await stripe.paymentIntents.confirm(data.paymentIntentId, {
             payment_method: payment_method.method_id,
@@ -368,7 +374,7 @@ export const transactions = async (req: AuthenticatedRequest, res: Response) => 
           student: { select: { name: true } },
           expert: { select: { name: true } },
           transaction: {
-            where: { status: { in: ["COMPLETED", "REFUNDED"] } },
+            // where: { status: { in: ["COMPLETED", "REFUNDED"] } },
             select: {
               id: true,
               amount: true,
@@ -385,17 +391,21 @@ export const transactions = async (req: AuthenticatedRequest, res: Response) => 
       }),
     ]);
 
-    const bookingFormatted = bookingTransactions.map((item) => ({
-      name:
-        item.studentId === user_id
-          ? item.expert?.name ?? "Unknown Expert"
-          : item.student?.name ?? "Unknown Student",
-      refund_reason: item.refund_reason,
-      refunded: item.transaction?.status === "REFUNDED",
-      type: item.transaction.type,
-      withdraw: false,
-      ...item.transaction,
-    }));
+    const bookingFormatted = bookingTransactions.map((item) => {
+      const is_student = item.studentId === user_id
+      const order_type = is_student && item.transaction.type === 'order' ? 'send-order' : 'received-order'
+      return {
+        name:
+          is_student
+            ? item.expert?.name ?? "Unknown Expert"
+            : item.student?.name ?? "Unknown Student",
+        refund_reason: item.refund_reason,
+        refunded: item.transaction?.status === "REFUNDED",
+        withdraw: false,
+        ...item.transaction,
+        type: order_type,
+      }
+    });
 
     const payoutWhere: any = {
       bookingId: null,

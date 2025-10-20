@@ -268,7 +268,7 @@ export const messages = async (req: Request, res: Response) => {
 
     const messages = await prisma.message.findMany({
       where: { conversationId },
-      orderBy: { createdAt: "asc" },
+      orderBy: { createdAt: "desc" },
       skip,
       take: perPage,
       include: {
@@ -289,7 +289,7 @@ export const messages = async (req: Request, res: Response) => {
     res.status(200).json({
       success: true,
       message: 'Messages fetched successfully.',
-      data: updatedMessages,
+      data: updatedMessages.reverse(),
       pagination: {
         page,
         perPage,
