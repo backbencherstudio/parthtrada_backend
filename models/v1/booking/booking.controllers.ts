@@ -113,6 +113,14 @@ export const create = async (req: AuthenticatedRequest, res: Response) => {
       },
     });
 
+    console.log('================booking created====================');
+    console.log({
+        bookingId: booking.id,
+        amount: amount,
+        paymentIntentId: paymentIntent.id,
+      });
+    console.log('====================================');
+
     return res.status(201).json({
       success: true,
       message: "Booking Request sent successfully",

@@ -20,8 +20,9 @@ const format_data = (text: string) => {
   }
 }
 
-export const index = async (req: Request, res: Response) => {
+export const index = async (req: AuthenticatedRequest, res: Response) => {
   try {
+    const user_id = req.user?.id
     const query = expertsQuerySchema.safeParse(req.query);
     if (!query.success) {
       res.status(400).json({
@@ -129,7 +130,7 @@ Only return valid JSON — no explanations.
     const dataWithRatings = data.map(expert => ({
       ...expert,
       rating: ratingsMap[expert.userId] ?? { avg: 0, total: 0 },
-    }));
+    })).filter(expert => expert.userId !== user_id)
 
     return res.status(200).json({
       success: true,
@@ -396,7 +397,6 @@ export const getReviews = async (req: AuthenticatedRequest, res: Response) => {
     });
   }
 };
-
 
 export const acceptRejectBooking = async (req: AuthenticatedRequest, res: Response) => {
   try {

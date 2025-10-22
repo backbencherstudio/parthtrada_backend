@@ -42,6 +42,7 @@ model StudentProfile {
 model ExpertProfile {
   id                 String              @id @default(cuid())
   profession         String?
+  university         String?
   organization       String?
   location           String?
   description        String?

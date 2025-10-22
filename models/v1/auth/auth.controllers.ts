@@ -366,6 +366,8 @@ export const beExpert = async (
     const userId = req.user?.id;
 
     const {
+      name,
+      university,
       profession,
       organization,
       location,
@@ -378,10 +380,11 @@ export const beExpert = async (
     } = req.body;
 
     const requiredFields = [
+      "name",
+      "university",
       "profession",
       "organization",
       "location",
-      "description",
       "experience",
       "hourlyRate",
       "skills",
@@ -429,10 +432,12 @@ export const beExpert = async (
     const updatedUser = await prisma.users.update({
       where: { id: userId },
       data: {
+        name,
         activeProfile: "EXPERT",
         expertProfile: currentUser.expertProfile
           ? {
             update: {
+              university,
               profession,
               organization,
               location,
