@@ -170,6 +170,11 @@ export const index = async (
     const bookings = await prisma.booking.findMany({
       where,
       include: {
+        expert: {
+          include: {
+            expertProfile: true
+          }
+        },
         review: {
           select: {
             id: true
@@ -181,8 +186,13 @@ export const index = async (
       orderBy: { date: "desc" },
     });
 
-    const updatedBookings = bookings.map(booking => ({
+    const updatedBookings = bookings.map(({ expert, ...booking }) => ({
       ...booking,
+      user: {
+        name: expert.name,
+        image: expert.image,
+        profession: expert.expertProfile?.profession || null
+      },
       should_review: booking.status === "COMPLETED" && !booking.review,
       should_refund: booking.status === 'CANCELLED'
     }));
@@ -190,7 +200,7 @@ export const index = async (
     res.status(200).json({
       success: true,
       message: "Bookings fetched successfully",
-      data: updatedBookings,
+      data: serializeBigInt(updatedBookings),
       pagination: {
         total,
         page,
@@ -202,6 +212,10 @@ export const index = async (
     });
     return
   } catch (error) {
+    console.log('got error from getting bookings');
+    console.log(error?.message);
+
+
     res.status(500).json({
       success: false,
       message: "Failed to get bookings.",
@@ -479,9 +493,21 @@ export const expertIndex = async (req: AuthenticatedRequest, res: Response): Pro
         ...where,
         status: { in: ['PENDING', 'UPCOMING'] },
       },
+      include: {
+        student: {
+          include: {
+            studentProfile: true
+          }
+        },
+        expert: {
+          include: {
+            expertProfile: true
+          }
+        }
+      },
       skip,
       take: perPage,
-      orderBy: { updatedAt: "desc" },
+      orderBy: { date: "desc" },
     });
     const notifications = [];
     for (const booking of bookings) {
@@ -511,12 +537,16 @@ export const expertIndex = async (req: AuthenticatedRequest, res: Response): Pro
       };
     });
 
-    const modified = merged.map(booking => ({
-      ...booking,
-      review: null,
-      should_review: null,
-      should_refund: null
-    }));
+    const modified = merged.map(({ student, expert, ...booking }) => {
+      const user = expertID === expert.id ? { name: student.name, image: student.image, profession: student.studentProfile?.profession || null } : { name: expert.name, image: expert.image, profession: expert.expertProfile?.profession ?? null }
+      return {
+        ...booking,
+        user: user,
+        review: null,
+        should_review: null,
+        should_refund: null
+      }
+    });
 
     res.status(200).json({
       success: true,
