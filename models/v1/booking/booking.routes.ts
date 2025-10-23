@@ -15,7 +15,7 @@ const router = Router();
 router.post("/", verifyUser("ANY",), create);
 router.get("/", verifyUser("STUDENT"), index);
 router.patch("/cancel/:id", verifyUser("ANY"), cancelBooking);
-router.get("/past-call", verifyUser("STUDENT"), pastCallStudent)
+router.get("/past-call", verifyUser("ANY"), pastCallStudent)
 router.get("/request", verifyUser("ANY"), bookingRequest)
 
 // Expert Routes

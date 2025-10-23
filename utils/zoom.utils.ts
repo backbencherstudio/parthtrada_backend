@@ -7,6 +7,7 @@ interface CreateZoomMeetingParams {
   duration: number; // in minutes
   agenda?: string;
   timezone?: string; // IANA timezone name, defaults to 'UTC'
+  tracking_fields?: any
 }
 
 interface ZoomMeeting {
@@ -59,10 +60,11 @@ export async function createZoomMeeting(params: CreateZoomMeetingParams): Promis
     duration,
     agenda = "",
     timezone = "UTC",
+    tracking_fields
   } = params;
 
   const accessToken = await getAccessToken();
-//   console.log("accessToken", accessToken)
+  //   console.log("accessToken", accessToken)
   if (!accessToken) {
     throw new Error("Zoom access token not found in environment variables (ZOOM_JWT_TOKEN or ZOOM_ACCESS_TOKEN)");
   }
@@ -81,11 +83,15 @@ export async function createZoomMeeting(params: CreateZoomMeetingParams): Promis
         timezone,
         agenda,
         settings: {
+          approval_type: 2,
           join_before_host: false,
           mute_upon_entry: true,
-          approval_type: 0, // automatic approval
           meeting_authentication: true,
+          auto_transcribing: true,
+          auto_start_meeting_summary: true,
+          auto_recording: "cloud",
         },
+        tracking_fields: tracking_fields,
       },
       {
         headers: {
@@ -107,4 +113,4 @@ export async function createZoomMeeting(params: CreateZoomMeetingParams): Promis
     }
     throw error;
   }
-} 
+}

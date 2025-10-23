@@ -68,6 +68,7 @@ model Booking {
   studentDateTime DateTime?
   meetingLink     String?
   meetingID       BigInt?       @unique
+  meeting_summery String?
   sessionDetails  Json
   sessionDuration Int
   status          BookingStatus @default(PENDING)

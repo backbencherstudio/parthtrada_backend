@@ -17,6 +17,9 @@ export const accept_booking = async (booking: BookingWithRelations) => {
         duration: booking.sessionDuration,
         agenda: JSON.stringify(booking.sessionDetails),
         timezone: booking?.expert?.timezone ?? "UTC",
+        tracking_fields: [
+            { field: "booking_id", value: booking.id },
+        ]
     });
 
     await prisma.notification.create({

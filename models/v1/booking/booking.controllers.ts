@@ -115,10 +115,10 @@ export const create = async (req: AuthenticatedRequest, res: Response) => {
 
     console.log('================booking created====================');
     console.log({
-        bookingId: booking.id,
-        amount: amount,
-        paymentIntentId: paymentIntent.id,
-      });
+      bookingId: booking.id,
+      amount: amount,
+      paymentIntentId: paymentIntent.id,
+    });
     console.log('====================================');
 
     return res.status(201).json({
@@ -328,7 +328,7 @@ export const pastCallStudent = async (req: AuthenticatedRequest, res: Response) 
         },
         skip,
         take: perPage,
-        orderBy: { date: "desc" },
+        orderBy: { updatedAt: "desc" },
       }),
       prisma.booking.count({ where })
     ])
@@ -339,6 +339,7 @@ export const pastCallStudent = async (req: AuthenticatedRequest, res: Response) 
       duration: item.sessionDuration,
       date: item.date,
       amount: item.transaction.amount,
+      meeting_summery: item.meeting_summery
     }));
 
 
