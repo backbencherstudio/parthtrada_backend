@@ -17,6 +17,7 @@ export const accept_booking = async (booking: BookingWithRelations) => {
         duration: booking.sessionDuration,
         agenda: JSON.stringify(booking.sessionDetails),
         timezone: booking?.expert?.timezone ?? "UTC",
+        expert_email: booking.expert.email,
         tracking_fields: [
             { field: "booking_id", value: booking.id },
         ]

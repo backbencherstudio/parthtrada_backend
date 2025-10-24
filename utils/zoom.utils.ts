@@ -7,7 +7,8 @@ interface CreateZoomMeetingParams {
   duration: number; // in minutes
   agenda?: string;
   timezone?: string; // IANA timezone name, defaults to 'UTC'
-  tracking_fields?: any
+  tracking_fields?: any,
+  expert_email: string
 }
 
 interface ZoomMeeting {
@@ -60,6 +61,7 @@ export async function createZoomMeeting(params: CreateZoomMeetingParams): Promis
     duration,
     agenda = "",
     timezone = "UTC",
+    expert_email,
     tracking_fields
   } = params;
 
@@ -84,12 +86,15 @@ export async function createZoomMeeting(params: CreateZoomMeetingParams): Promis
         agenda,
         settings: {
           approval_type: 2,
-          join_before_host: false,
+          join_before_host: true,
+          waiting_room: false,
           mute_upon_entry: true,
-          meeting_authentication: true,
+          meeting_authentication: false,
           auto_transcribing: true,
           auto_start_meeting_summary: true,
-          auto_recording: "cloud",
+          live_transcription: true,
+          // auto_recording: "cloud",
+          // alternative_hosts: expert_email
         },
         tracking_fields: tracking_fields,
       },

@@ -280,7 +280,9 @@ export const getExpertReviews = async (req: AuthenticatedRequest, res: Response)
     const [totalReviews, reviews] = await Promise.all([
       prisma.review.count(),
       prisma.review.findMany({
-        where: {},
+        where: {
+          expertId: id
+        },
         include: {
           student: { select: { name: true, email: true, image: true } },
           booking: { select: { date: true } },
@@ -528,7 +530,7 @@ export const acceptRejectBooking = async (req: AuthenticatedRequest, res: Respon
       message: message,
     });
   } catch (error) {
-    console.error("Error processing booking:", error);
+    console.error("Error processing booking:", error?.message);
     res.status(500).json({
       success: false,
       message: "Failed to process booking request",
@@ -651,6 +653,7 @@ export const createMeetingLink = async (req: AuthenticatedRequest, res: Response
         duration: booking.sessionDuration, // expecting minutes
         agenda: booking.sessionDetails as string,
         timezone: booking.expert?.timezone || "UTC",
+        expert_email: ''
       });
       // console.log("meetingLink", zoomMeeting)
       meetingLink = zoomMeeting.join_url;
