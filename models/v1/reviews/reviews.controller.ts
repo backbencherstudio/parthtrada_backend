@@ -58,6 +58,9 @@ export const create = async (req: AuthenticatedRequest, res: Response) => {
         }
 
     } catch (error) {
+        console.log('===============error creating review=====================');
+        console.log(error?.message);
+        console.log('====================================');
         if (
             error instanceof PrismaClientKnownRequestError &&
             error.code === 'P2002'

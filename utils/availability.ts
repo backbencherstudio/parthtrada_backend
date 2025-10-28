@@ -52,16 +52,6 @@ function normalizeTimeArray(result: { availableDays: string[], availableTime: st
     };
 }
 
-// Example usage
-const result = {
-    availableDays: ["Monday-Tuesday", "Thursday-Friday"],
-    availableTime: ["09:00 – 18:00"]
-};
-
-const output = normalizeTimeArray(result);
-console.log(output);
-
-
 export {
     groupDays,
     getTimeRange,

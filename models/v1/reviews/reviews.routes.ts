@@ -4,6 +4,6 @@ import { create } from "./reviews.controller";
 
 const router = Router()
 
-router.post('/', verifyUser('STUDENT'), create)
+router.post('/', verifyUser('EXPERT'), create)
 
 export default router

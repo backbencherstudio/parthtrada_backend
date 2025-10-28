@@ -162,6 +162,9 @@ export const index = async (
   try {
     const where: Prisma.BookingWhereInput = {
       studentId: studentID,
+      transaction: {
+        status: 'COMPLETED'
+      },
       ...(status ? { status } : {}),
     };
 
@@ -170,9 +173,14 @@ export const index = async (
     const bookings = await prisma.booking.findMany({
       where,
       include: {
+        student: {
+          include: {
+            transactions: true
+          }
+        },
         expert: {
           include: {
-            expertProfile: true
+            expertProfile: true,
           }
         },
         review: {
@@ -194,7 +202,8 @@ export const index = async (
         profession: expert.expertProfile?.profession || null
       },
       should_review: booking.status === "COMPLETED" && !booking.review,
-      should_refund: booking.status === 'CANCELLED'
+      should_refund: booking.status === 'CANCELLED',
+      // refunded: booking.student.transactions[0].status
     }));
 
     res.status(200).json({
@@ -277,24 +286,15 @@ export const cancelBooking = async (req: AuthenticatedRequest,
       }
     });
 
-    await prisma.transaction.create({
-      data: {
-        userId: student_id,
-        amount: booking.transaction.amount,
-        type: 'refund-request',
-        currency: 'usd',
-        provider: "STRIPE",
-        providerId: booking.id,
-        status: "PENDING",
-      },
-    });
-
     return res.status(200).json({
       success: true,
       message: "Booking cancelled successfully.",
-      data: updated_data
+      data: serializeBigInt(updated_data)
     });
   } catch (error) {
+    console.log('=============error=======================');
+    console.log(error?.message);
+    console.log('====================================');
     res.status(500).json({
       success: false,
       message: "Failed to cancel booking.",
@@ -492,6 +492,9 @@ export const expertIndex = async (req: AuthenticatedRequest, res: Response): Pro
       where: {
         ...where,
         status: { in: ['PENDING', 'UPCOMING'] },
+        transaction: {
+          status: 'COMPLETED'
+        }
       },
       include: {
         student: {

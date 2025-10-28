@@ -326,6 +326,197 @@ export const refundReview = async (req: AuthenticatedRequest, res: Response) => 
   }
 }
 
+export const refundRequest = async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const booking_id = req.params.booking_id;
+    const student_id = req.user?.id;
+    const booking = await prisma.booking.findUnique({
+      where: {
+        id: booking_id,
+        studentId: student_id,
+        status: 'CANCELLED',
+        transaction: {
+          status: 'COMPLETED'
+        }
+      },
+      select: {
+        id: true,
+        status: true,
+        sessionDetails: true,
+        transaction: {
+          select: {
+            amount: true,
+            status: true
+          }
+        },
+        student: true,
+        expert: true
+      }
+    })
+
+    console.log('======booking==============================');
+    console.log(booking);
+    console.log('====================================');
+
+    if (!booking) {
+      return res.status(400).json({
+        success: false,
+        message: 'Refund request or booking not found.'
+      })
+    }
+
+    const transaction = await prisma.transaction.create({
+      data: {
+        userId: student_id,
+        amount: booking.transaction.amount,
+        type: 'refund-request',
+        currency: 'usd',
+        provider: "STRIPE",
+        providerId: booking.id,
+        status: "PENDING",
+      },
+      include: {
+        booking: {
+          include: {
+            student: true,
+            expert: true
+          }
+        }
+      }
+    });
+
+    await prisma.notification.create({
+      data: {
+        image: booking.student.image,
+        title: booking.student.name,
+        message: `Sent you refund request ${transaction.amount}`,
+        type: 'BOOKING_CANCELLED_BY_STUDENT',
+        sender_id: booking.student.id,
+        recipientId: booking.expert.id,
+        meta: {
+          booking_id: booking.id,
+          sessionDetails: booking.sessionDetails,
+          disabled: false,
+          texts: ['Mark as refunded']
+        }
+      }
+    })
+
+    // Send notification
+    io.to(booking.expert.id).emit('received-notification', {
+      image: booking.student.image,
+      title: booking.expert.name,
+      message: `Sent you refund request ${transaction.amount}`
+    })
+
+    return res.status(200).json({
+      success: true,
+      message: "Refund request sent successfully.",
+    });
+  } catch (error) {
+    console.log('=============error=======================');
+    console.log(error?.message);
+    console.log('====================================');
+    res.status(500).json({
+      success: false,
+      message: "Failed to create refund request.",
+      error: "Internal server error",
+    });
+  }
+}
+
+export const refundReviewExpert = async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const notification_id = req.params.notification_id
+    const booking_id = req.params.booking_id
+    const user_id = req.user.id
+
+    const booking = await prisma.booking.findUnique({
+      where: {
+        id: booking_id
+      },
+      include: {
+        expert: true,
+        student: true
+      }
+    })
+
+    const transaction = await prisma.transaction.findFirst({
+      where: {
+        type: 'refund-request',
+        providerId: booking_id,
+        status: "PENDING",
+      }
+    })
+
+    await prisma.transaction.update({
+      where: {
+        id: transaction.id
+      },
+      data: {
+        status: 'REFUNDED'
+      }
+    })
+
+    const notification = await prisma.notification.findFirst({
+      where: {
+        id: notification_id
+      },
+    });
+
+    const meta = notification.meta as Object
+
+    const updated_meta: any = {
+      ...meta,
+      disabled: true
+    }
+
+    await prisma.notification.update({
+      where: {
+        id: notification_id
+      },
+      data: {
+        meta: updated_meta
+      }
+    })
+
+    await prisma.notification.create({
+      data: {
+        type: 'REFUND_REVIEW',
+        image: booking.expert.image,
+        title: booking.expert.name,
+        message: 'Expert marked the refund as sent. Dit it reach you?',
+        sender_id: booking.expert.id,
+        recipientId: booking.student.id,
+        meta: {
+          booking_id: booking_id,
+          sessionDetails: null,
+          disabled: false,
+          texts: ['Confirm Received'],
+        }
+      }
+    })
+
+    io.to(booking.student.id).emit('received-notification', {
+      image: booking.expert.image,
+      title: booking.expert.name,
+      message: `Expert marked the refund as sent. Dit it reach you?`
+    })
+
+    return res.status(201).json({
+      success: true,
+      message: 'Refund request reviewed successfully.',
+      data: transaction
+    })
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to confirm review refund request.",
+      error: "Internal server error",
+    });
+  }
+}
+
 export const transactions = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const query = paginationQuerySchema.safeParse(req.query);
@@ -476,23 +667,12 @@ export const transactions = async (req: AuthenticatedRequest, res: Response) => 
 
 export const refundTransaction = async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { data, error, success } = refundTransactionSchema.safeParse(req.body);
-    if (!success) {
-      if (!success) {
-        return res.status(400).json({
-          success: false,
-          errors: JSON.parse(error.message).map(err => ({
-            field: err.path.join("."),
-            message: err.message,
-          })),
-        });
-      }
-    }
+    const booking_id = req.params.booking_id
 
     const userId = req.user?.id;
 
     const booking = await prisma.booking.findUnique({
-      where: { id: data.bookingId },
+      where: { id: booking_id },
       include: { transaction: true }
     });
 
@@ -515,23 +695,34 @@ export const refundTransaction = async (req: AuthenticatedRequest, res: Response
     // Update booking and transaction status
     await prisma.$transaction([
       prisma.booking.update({
-        where: { id: data.bookingId },
+        where: { id: booking_id },
         data: { status: "REFUNDED" }
       }),
       prisma.transaction.update({
-        where: { bookingId: data.bookingId },
+        where: { bookingId: booking_id },
         data: {
           status: "REFUNDED",
           refundDate: new Date(),
-          refundReason: data?.reason || 'requested_by_customer'
+          refundReason: 'requested_by_customer'
         }
       })
     ]);
 
+    const notification = await prisma.notification.findFirst({
+      where: {
+        type: 'BOOKING_CANCELLED_BY_STUDENT',
+        AND: [
+          { meta: { path: ['booking_id'], equals: booking.id } },
+          { meta: { path: ['disabled'], equals: false } },
+        ],
+      },
+    });
+
     res.json({
       success: true,
       message: "Refund initiated successfully",
-      refundId: refund.id
+      refundId: refund.id,
+      notification
     });
   } catch (error) {
     console.error("Error initiating refund:", error);

@@ -172,6 +172,25 @@ export const index = (notifications: Notification[]) => {
                         }
                     ]
                 }
+            case 'BOOKING_CANCELLED_BY_STUDENT':
+                // @ts-ignore
+                booking_id = notification.meta?.booking_id as string
+                const mm: any = notification?.meta
+                return {
+                    img: notification.image,
+                    title: notification.title,
+                    description: notification.message,
+                    actions: [
+                        {
+                            bg_primary: true,
+                            text: mm.texts?.[0],
+                            url: `/payments/refund/experts/reviews/${booking_id}/${notification.id}`,
+                            req_method: 'PATCH',
+                            disabled: mm.disabled
+                            // disabled: mm.texts?.[0] === 'Confirmed' ? true : false
+                        }
+                    ]
+                }
             default:
                 return notification
         }

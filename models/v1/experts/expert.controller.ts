@@ -228,34 +228,36 @@ export const getExpertById = async (req: Request, res: Response) => {
       availableTime: getTimeRange(expert.availableTime)
     };
 
+    const x = {
+      expert: {
+        id: expert.id,
+        profession: expert.profession,
+        organization: expert.organization,
+        location: expert.location,
+        description: expert.description,
+        experience: expert.experience,
+        hourlyRate: expert.hourlyRate,
+        skills: expert.skills,
+        availability: {
+          days: normalizeTimeArray(result).availableDays,
+          time: normalizeTimeArray(result).availableTime,
+        },
+        availableDays: expert.availableDays,
+        availableTime: expert.availableTime,
+        user: expert.user,
+      },
+      stats: {
+        totalReviews,
+        averageRating,
+        ratingDistribution,
+        totalStudents,
+      },
+    }
+
     return res.status(200).json({
       success: true,
       message: "Expert fetched successfully.",
-      data: {
-        expert: {
-          id: expert.id,
-          profession: expert.profession,
-          organization: expert.organization,
-          location: expert.location,
-          description: expert.description,
-          experience: expert.experience,
-          hourlyRate: expert.hourlyRate,
-          skills: expert.skills,
-          availability: {
-            days: normalizeTimeArray(result).availableDays,
-            time: normalizeTimeArray(result).availableTime,
-          },
-          availableDays: expert.availableDays,
-          availableTime: expert.availableTime,
-          user: expert.user,
-        },
-        stats: {
-          totalReviews,
-          averageRating,
-          ratingDistribution,
-          totalStudents,
-        },
-      },
+      data: x,
     });
   } catch (error) {
     console.error("Error getting expert:", error?.message);
@@ -511,7 +513,7 @@ export const acceptRejectBooking = async (req: AuthenticatedRequest, res: Respon
       texts: updatedMetaTexts,
     }
 
-    await prisma.notification.update({
+    const response = await prisma.notification.update({
       where: { id: notification_id },
       data: {
         meta: payload,
@@ -524,6 +526,10 @@ export const acceptRejectBooking = async (req: AuthenticatedRequest, res: Respon
       where: { id: id },
       data: { status: newStatus, refund_reason: refund_reason ?? null, meetingLink, meetingID: meetingID },
     });
+
+    console.log('==========response==========================');
+    console.log(response);
+    console.log('====================================');
 
     res.status(200).json({
       success: true,
