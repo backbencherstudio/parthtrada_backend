@@ -449,9 +449,25 @@ export const refundReviewExpert = async (req: AuthenticatedRequest, res: Respons
       }
     })
 
+    if (!transaction || transaction.status === 'REFUNDED') {
+      return res.status(400).json({
+        success: false,
+        message: 'Already refunded funds.'
+      })
+    }
+
     await prisma.transaction.update({
       where: {
         id: transaction.id
+      },
+      data: {
+        status: 'REFUNDED'
+      }
+    })
+
+    await prisma.booking.update({
+      where: {
+        id: booking.id
       },
       data: {
         status: 'REFUNDED'

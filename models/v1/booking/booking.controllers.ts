@@ -113,14 +113,6 @@ export const create = async (req: AuthenticatedRequest, res: Response) => {
       },
     });
 
-    console.log('================booking created====================');
-    console.log({
-      bookingId: booking.id,
-      amount: amount,
-      paymentIntentId: paymentIntent.id,
-    });
-    console.log('====================================');
-
     return res.status(201).json({
       success: true,
       message: "Booking Request sent successfully",
@@ -191,20 +183,35 @@ export const index = async (
       },
       skip,
       take: perPage,
-      orderBy: { date: "desc" },
+      orderBy: { updatedAt: "desc" },
     });
 
-    const updatedBookings = bookings.map(({ expert, ...booking }) => ({
-      ...booking,
-      user: {
-        name: expert.name,
-        image: expert.image,
-        profession: expert.expertProfile?.profession || null
-      },
-      should_review: booking.status === "COMPLETED" && !booking.review,
-      should_refund: booking.status === 'CANCELLED',
-      // refunded: booking.student.transactions[0].status
-    }));
+    const updatedBookings = bookings.map(({ expert, student, ...booking }, index) => {
+      const refunded = student.transactions?.some(
+        (t) => {
+          return booking.status === 'REFUNDED' && t.providerId === booking.id
+        }
+      )
+      const type = student.transactions?.some(
+        (t) => {
+          return t.type === 'refund-request' && t.providerId === booking.id
+        }
+      )
+      return ({
+        ...booking,
+        user: {
+          name: expert.name,
+          image: expert.image,
+          profession: expert.expertProfile?.profession || null
+        },
+        should_review: booking.status === "COMPLETED" && !booking.review,
+        should_refund: booking.status === 'CANCELLED',
+        transaction: {
+          type: type ? 'refund-request' : null,
+          refunded
+        }
+      })
+    });
 
     res.status(200).json({
       success: true,
