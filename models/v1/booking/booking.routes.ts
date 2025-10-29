@@ -19,6 +19,6 @@ router.get("/past-call", verifyUser("ANY"), pastCallStudent)
 router.get("/request", verifyUser("ANY"), bookingRequest)
 
 // Expert Routes
-router.get('/schedule/expert', verifyUser('EXPERT'), expertIndex);
+router.get('/schedule/expert', verifyUser('ANY'), expertIndex);
 
 export default router;

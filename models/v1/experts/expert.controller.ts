@@ -6,6 +6,7 @@ import { expertScheduleQuerySchema, expertsQuerySchema } from "@/utils/queryVali
 import { accept_booking, cancel_booking } from "@/utils/notification";
 import { getTimeRange, groupDays, normalizeTimeArray } from "@/utils/availability";
 import AIRequest from "@/services/aiService";
+import { io } from "@/socketServer";
 
 const prisma = new PrismaClient();
 
@@ -527,9 +528,15 @@ export const acceptRejectBooking = async (req: AuthenticatedRequest, res: Respon
       data: { status: newStatus, refund_reason: refund_reason ?? null, meetingLink, meetingID: meetingID },
     });
 
-    console.log('==========response==========================');
-    console.log(response);
-    console.log('====================================');
+    // Send notification
+    io.to(booking.studentId).emit('received-notification', {
+      image: booking.expert.image,
+      title: booking.expert.name,
+      message: `New notification from ${booking.expert.name}`,
+      sender: {
+        name: `New notification from ${booking.expert.name}`
+      }
+    })
 
     res.status(200).json({
       success: true,

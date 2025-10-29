@@ -52,6 +52,9 @@ io.on("connection", (socket) => {
 
   socket.on("send-message", async (message) => {
     try {
+      console.log('==============new message======================');
+      console.log(message);
+      console.log('====================================');
       const new_message: any = await createMessage({ content: message.content, recipientId: message.recipientId, user_id: message.user_id })
       io.to(message.recipientId).emit("new-message", { id: crypto.randomUUID(), ...message, createdAt: new_message.createdAt, sender: new_message.sender });
     } catch (error) {

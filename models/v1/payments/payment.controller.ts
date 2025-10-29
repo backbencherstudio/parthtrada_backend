@@ -254,7 +254,10 @@ export const confirmPayment = async (req: AuthenticatedRequest, res: Response) =
           io.to(transaction.booking.expertId).emit('received-notification', {
             image: transaction.booking.student.image,
             title: notification_title,
-            message: notification_message
+            message: notification_message,
+            sender: {
+              name: `New notification from ${notification_title}`
+            }
           })
         } else {
           throw new Error(`PaymentIntent not ready to capture. Status: ${updatedIntent.status}`);
@@ -354,10 +357,6 @@ export const refundRequest = async (req: AuthenticatedRequest, res: Response) =>
       }
     })
 
-    console.log('======booking==============================');
-    console.log(booking);
-    console.log('====================================');
-
     if (!booking) {
       return res.status(400).json({
         success: false,
@@ -406,7 +405,10 @@ export const refundRequest = async (req: AuthenticatedRequest, res: Response) =>
     io.to(booking.expert.id).emit('received-notification', {
       image: booking.student.image,
       title: booking.expert.name,
-      message: `Sent you refund request ${transaction.amount}`
+      message: `Sent you refund request ${transaction.amount}`,
+      sender: {
+        name: `Sent you refund request ${booking.student.name}`
+      }
     })
 
     return res.status(200).json({
@@ -639,10 +641,10 @@ export const transactions = async (req: AuthenticatedRequest, res: Response) => 
     ]);
 
     const payoutFormatted = payoutTransactions.map((tx) => ({
-      name: "Payout",
+      name: tx.status === "REFUNDED" ? "Refunded" : "Payout",
       refund_reason: null,
       refunded: tx.status === "REFUNDED",
-      withdraw: true,
+      withdraw: tx.status === "REFUNDED" ? false : true,
       ...tx,
     }));
 
@@ -833,8 +835,8 @@ export const balance = async (req: AuthenticatedRequest, res: Response) => {
 
     res.status(200).json({
       data: {
-        amount: balance.available[0].amount / 100,
-        currency: balance.available[0].currency
+        amount: ((balance.available[0].amount / 100).toFixed(2)),
+        currency: 'usd'
       }
     })
     return
