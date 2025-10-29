@@ -53,7 +53,7 @@ export const createStripeAccount = async (
         last_name: expert.user.name?.split(" ")[1] || "",
       },
       business_profile: {
-        url: 'https://e-learning.com',
+        url: 'https://truenote.ai',
         mcc: '8299' // for business category code
       },
       capabilities: {

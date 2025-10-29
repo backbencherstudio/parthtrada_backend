@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { linkedinCallback, updateUser, beExpert, beStudent, fordev, fordevSignup, adminLogin, verifyOTP, resendOTP, register, forgotPassword, verifyResetToken, resetPassword } from './auth.controllers';
+import { linkedinCallback, updateUser, beExpert, beStudent, fordev, fordevSignup, adminLogin, verifyOTP, resendOTP, register, forgotPassword, verifyResetToken, resetPassword, logout } from './auth.controllers';
 import { verifyUser } from '@/middleware/verifyUsers';
 import upload from '@/config/multer.config';
 
@@ -12,8 +12,8 @@ router.post('/for-dev-signup', fordevSignup);
 
 router.put('/update', verifyUser('ANY'), upload.single("image"), updateUser);
 
-router.put('/be-expert', verifyUser('STUDENT'), beExpert)
-router.put('/be-student', verifyUser('EXPERT'), beStudent);
+router.put('/be-expert', verifyUser('ANY'), beExpert)
+router.put('/be-student', verifyUser('ANY'), beStudent);
 
 router.post('/login', adminLogin);
 router.post('/register', register);

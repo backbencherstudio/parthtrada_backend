@@ -6,6 +6,7 @@ import { expertScheduleQuerySchema, expertsQuerySchema } from "@/utils/queryVali
 import { accept_booking, cancel_booking } from "@/utils/notification";
 import { getTimeRange, groupDays, normalizeTimeArray } from "@/utils/availability";
 import AIRequest from "@/services/aiService";
+import { io } from "@/socketServer";
 
 const prisma = new PrismaClient();
 
@@ -20,8 +21,9 @@ const format_data = (text: string) => {
   }
 }
 
-export const index = async (req: Request, res: Response) => {
+export const index = async (req: AuthenticatedRequest, res: Response) => {
   try {
+    const user_id = req.user?.id
     const query = expertsQuerySchema.safeParse(req.query);
     if (!query.success) {
       res.status(400).json({
@@ -129,7 +131,7 @@ Only return valid JSON — no explanations.
     const dataWithRatings = data.map(expert => ({
       ...expert,
       rating: ratingsMap[expert.userId] ?? { avg: 0, total: 0 },
-    }));
+    })).filter(expert => expert.userId !== user_id)
 
     return res.status(200).json({
       success: true,
@@ -227,34 +229,36 @@ export const getExpertById = async (req: Request, res: Response) => {
       availableTime: getTimeRange(expert.availableTime)
     };
 
+    const x = {
+      expert: {
+        id: expert.id,
+        profession: expert.profession,
+        organization: expert.organization,
+        location: expert.location,
+        description: expert.description,
+        experience: expert.experience,
+        hourlyRate: expert.hourlyRate,
+        skills: expert.skills,
+        availability: {
+          days: normalizeTimeArray(result).availableDays,
+          time: normalizeTimeArray(result).availableTime,
+        },
+        availableDays: expert.availableDays,
+        availableTime: expert.availableTime,
+        user: expert.user,
+      },
+      stats: {
+        totalReviews,
+        averageRating,
+        ratingDistribution,
+        totalStudents,
+      },
+    }
+
     return res.status(200).json({
       success: true,
       message: "Expert fetched successfully.",
-      data: {
-        expert: {
-          id: expert.id,
-          profession: expert.profession,
-          organization: expert.organization,
-          location: expert.location,
-          description: expert.description,
-          experience: expert.experience,
-          hourlyRate: expert.hourlyRate,
-          skills: expert.skills,
-          availability: {
-            days: normalizeTimeArray(result).availableDays,
-            time: normalizeTimeArray(result).availableTime,
-          },
-          availableDays: expert.availableDays,
-          availableTime: expert.availableTime,
-          user: expert.user,
-        },
-        stats: {
-          totalReviews,
-          averageRating,
-          ratingDistribution,
-          totalStudents,
-        },
-      },
+      data: x,
     });
   } catch (error) {
     console.error("Error getting expert:", error?.message);
@@ -279,7 +283,9 @@ export const getExpertReviews = async (req: AuthenticatedRequest, res: Response)
     const [totalReviews, reviews] = await Promise.all([
       prisma.review.count(),
       prisma.review.findMany({
-        where: {},
+        where: {
+          expertId: id
+        },
         include: {
           student: { select: { name: true, email: true, image: true } },
           booking: { select: { date: true } },
@@ -397,7 +403,6 @@ export const getReviews = async (req: AuthenticatedRequest, res: Response) => {
   }
 };
 
-
 export const acceptRejectBooking = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { id, action, notification_id } = req.params;
@@ -509,7 +514,7 @@ export const acceptRejectBooking = async (req: AuthenticatedRequest, res: Respon
       texts: updatedMetaTexts,
     }
 
-    await prisma.notification.update({
+    const response = await prisma.notification.update({
       where: { id: notification_id },
       data: {
         meta: payload,
@@ -523,12 +528,22 @@ export const acceptRejectBooking = async (req: AuthenticatedRequest, res: Respon
       data: { status: newStatus, refund_reason: refund_reason ?? null, meetingLink, meetingID: meetingID },
     });
 
+    // Send notification
+    io.to(booking.studentId).emit('received-notification', {
+      image: booking.expert.image,
+      title: booking.expert.name,
+      message: `New notification from ${booking.expert.name}`,
+      sender: {
+        name: `New notification from ${booking.expert.name}`
+      }
+    })
+
     res.status(200).json({
       success: true,
       message: message,
     });
   } catch (error) {
-    console.error("Error processing booking:", error);
+    console.error("Error processing booking:", error?.message);
     res.status(500).json({
       success: false,
       message: "Failed to process booking request",
@@ -651,6 +666,7 @@ export const createMeetingLink = async (req: AuthenticatedRequest, res: Response
         duration: booking.sessionDuration, // expecting minutes
         agenda: booking.sessionDetails as string,
         timezone: booking.expert?.timezone || "UTC",
+        expert_email: ''
       });
       // console.log("meetingLink", zoomMeeting)
       meetingLink = zoomMeeting.join_url;

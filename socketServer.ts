@@ -7,7 +7,13 @@ import createMessage from "./services/sendMessage";
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
   cors: {
-    origin: [],
+    origin: [
+      "http://192.168.30.102:3000",
+      "http://localhost:3000",
+      "http://localhost:3001",
+      "http://localhost:5174",
+      "http://localhost:5173",
+    ],
     methods: ["GET", "POST"],
     credentials: true
   },
@@ -45,8 +51,14 @@ io.on("connection", (socket) => {
   });
 
   socket.on("send-message", async (message) => {
-    await createMessage({ content: message.content, recipientId: message.recipientId, user_id: message.user_id })
-    io.to(message.recipientId).emit("new-message", message);
+    try {
+      console.log('==============new message======================');
+      console.log(message);
+      console.log('====================================');
+      const new_message: any = await createMessage({ content: message.content, recipientId: message.recipientId, user_id: message.user_id })
+      io.to(message.recipientId).emit("new-message", { id: crypto.randomUUID(), ...message, createdAt: new_message.createdAt, sender: new_message.sender });
+    } catch (error) {
+    }
   });
 
   socket.on('send-notification', async (notification) => {

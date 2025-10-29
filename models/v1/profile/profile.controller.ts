@@ -96,6 +96,10 @@ export const updateProfile = async (req: AuthenticatedRequest, res: Response) =>
         const id = user?.id;
         const { data, error, success } = profileSchema.safeParse(req.body);
 
+        console.log('=============data=======================');
+        console.log(data);
+        console.log('====================================');
+
         if (!success) {
             return res.status(400).json({
                 success: false,

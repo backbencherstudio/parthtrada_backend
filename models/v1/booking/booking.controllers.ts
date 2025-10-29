@@ -29,6 +29,13 @@ export const create = async (req: AuthenticatedRequest, res: Response) => {
       });
     }
 
+    if (userId === data.expertId) {
+      return res.status(400).json({
+        success: false,
+        message: "You cannot create a booking for yourself.",
+      })
+    }
+
     // Check if expert has completed Stripe onboarding
     const expert = await prisma.expertProfile.findUnique({
       where: { userId: data.expertId },
@@ -71,7 +78,7 @@ export const create = async (req: AuthenticatedRequest, res: Response) => {
       }
     });
 
-    const amount = calculateSlotAmount(expert.hourlyRate, data.sessionDuration)
+    const amount = Number(calculateSlotAmount(expert.hourlyRate, data.sessionDuration).toFixed(2))
     const amountInCents = Math.round(amount * 100);
     const platformFee = Math.round(amountInCents * 0.1);
 
@@ -95,8 +102,10 @@ export const create = async (req: AuthenticatedRequest, res: Response) => {
 
     await prisma.transaction.create({
       data: {
+        userId: userId,
         bookingId: booking.id,
         amount: amount,
+        type: 'order',
         currency: data.currency,
         provider: "STRIPE",
         providerId: paymentIntent.id,
@@ -104,7 +113,7 @@ export const create = async (req: AuthenticatedRequest, res: Response) => {
       },
     });
 
-    return res.json({
+    return res.status(201).json({
       success: true,
       message: "Booking Request sent successfully",
       data: {
@@ -145,6 +154,9 @@ export const index = async (
   try {
     const where: Prisma.BookingWhereInput = {
       studentId: studentID,
+      transaction: {
+        status: 'COMPLETED'
+      },
       ...(status ? { status } : {}),
     };
 
@@ -153,6 +165,16 @@ export const index = async (
     const bookings = await prisma.booking.findMany({
       where,
       include: {
+        student: {
+          include: {
+            transactions: true
+          }
+        },
+        expert: {
+          include: {
+            expertProfile: true,
+          }
+        },
         review: {
           select: {
             id: true
@@ -161,19 +183,40 @@ export const index = async (
       },
       skip,
       take: perPage,
-      orderBy: { date: "desc" },
+      orderBy: { updatedAt: "desc" },
     });
 
-    const updatedBookings = bookings.map(booking => ({
-      ...booking,
-      should_review: booking.status === "COMPLETED" && !booking.review,
-      should_refund: booking.status === 'CANCELLED'
-    }));
+    const updatedBookings = bookings.map(({ expert, student, ...booking }, index) => {
+      const refunded = student.transactions?.some(
+        (t) => {
+          return booking.status === 'REFUNDED' && t.providerId === booking.id
+        }
+      )
+      const type = student.transactions?.some(
+        (t) => {
+          return t.type === 'refund-request' && t.providerId === booking.id
+        }
+      )
+      return ({
+        ...booking,
+        user: {
+          name: expert.name,
+          image: expert.image,
+          profession: expert.expertProfile?.profession || null
+        },
+        should_review: booking.status === "COMPLETED" && !booking.review,
+        should_refund: booking.status === 'CANCELLED',
+        transaction: {
+          type: type ? 'refund-request' : null,
+          refunded
+        }
+      })
+    });
 
     res.status(200).json({
       success: true,
       message: "Bookings fetched successfully",
-      data: updatedBookings,
+      data: serializeBigInt(updatedBookings),
       pagination: {
         total,
         page,
@@ -185,6 +228,10 @@ export const index = async (
     });
     return
   } catch (error) {
+    console.log('got error from getting bookings');
+    console.log(error?.message);
+
+
     res.status(500).json({
       success: false,
       message: "Failed to get bookings.",
@@ -194,7 +241,7 @@ export const index = async (
 };
 
 export const cancelBooking = async (req: AuthenticatedRequest,
-  res: Response): Promise<void> => {
+  res: Response): Promise<any> => {
   try {
     const booking_id = req.params.id
     const student_id = req.user?.id
@@ -202,6 +249,16 @@ export const cancelBooking = async (req: AuthenticatedRequest,
       where: {
         id: booking_id,
         studentId: student_id
+      },
+      select: {
+        id: true,
+        status: true,
+        transaction: {
+          select: {
+            amount: true,
+            status: true
+          }
+        }
       }
     })
 
@@ -212,22 +269,39 @@ export const cancelBooking = async (req: AuthenticatedRequest,
       })
     }
 
+    if (booking.status === "CANCELLED") {
+      return res.status(400).json({
+        success: false,
+        message: "This booking is already cancelled."
+      });
+    }
+
+    if (booking.transaction?.status !== "COMPLETED") {
+      return res.status(400).json({
+        success: false,
+        message: "You can only cancel bookings with a completed transaction."
+      });
+    }
+
     const updated_data = await prisma.booking.update({
       where: {
         id: booking_id,
       },
       data: {
-        status: 'CANCELLED',
-        refund_reason: 'Cancelled The Meeting'
+        status: "CANCELLED",
+        refund_reason: "Cancelled the meeting."
       }
-    })
+    });
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       message: "Booking cancelled successfully.",
-      data: updated_data
+      data: serializeBigInt(updated_data)
     });
   } catch (error) {
+    console.log('=============error=======================');
+    console.log(error?.message);
+    console.log('====================================');
     res.status(500).json({
       success: false,
       message: "Failed to cancel booking.",
@@ -275,7 +349,7 @@ export const pastCallStudent = async (req: AuthenticatedRequest, res: Response) 
         },
         skip,
         take: perPage,
-        orderBy: { date: "desc" },
+        orderBy: { updatedAt: "desc" },
       }),
       prisma.booking.count({ where })
     ])
@@ -286,6 +360,7 @@ export const pastCallStudent = async (req: AuthenticatedRequest, res: Response) 
       duration: item.sessionDuration,
       date: item.date,
       amount: item.transaction.amount,
+      meeting_summery: item.meeting_summery
     }));
 
 
@@ -424,10 +499,25 @@ export const expertIndex = async (req: AuthenticatedRequest, res: Response): Pro
       where: {
         ...where,
         status: { in: ['PENDING', 'UPCOMING'] },
+        transaction: {
+          status: 'COMPLETED'
+        }
+      },
+      include: {
+        student: {
+          include: {
+            studentProfile: true
+          }
+        },
+        expert: {
+          include: {
+            expertProfile: true
+          }
+        }
       },
       skip,
       take: perPage,
-      orderBy: { updatedAt: "desc" },
+      orderBy: { date: "desc" },
     });
     const notifications = [];
     for (const booking of bookings) {
@@ -457,12 +547,16 @@ export const expertIndex = async (req: AuthenticatedRequest, res: Response): Pro
       };
     });
 
-    const modified = merged.map(booking => ({
-      ...booking,
-      review: null,
-      should_review: null,
-      should_refund: null
-    }));
+    const modified = merged.map(({ student, expert, ...booking }) => {
+      const user = expertID === expert.id ? { name: student.name, image: student.image, profession: student.studentProfile?.profession || null } : { name: expert.name, image: expert.image, profession: expert.expertProfile?.profession ?? null }
+      return {
+        ...booking,
+        user: user,
+        review: null,
+        should_review: null,
+        should_refund: null
+      }
+    });
 
     res.status(200).json({
       success: true,

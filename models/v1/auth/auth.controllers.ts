@@ -112,6 +112,9 @@ export const linkedinCallback = async (req: Request, res: Response) => {
 
     // If user not found, create one
     if (!user) {
+      console.log('==============userInfo.picture======================');
+      console.log(userInfo.picture);
+      console.log('====================================');
       const savedImagePath = await downloadAndSaveImage(userInfo.picture);
 
       user = await prisma.users.create({
@@ -198,6 +201,16 @@ export const linkedinCallback = async (req: Request, res: Response) => {
     //   message: "Authentication failed",
     //   error: errorMessage,
     // });
+  }
+};
+
+export const logout = async (req: Request, res: Response) => {
+  try {
+    res.clearCookie("token");
+    res.redirect("elearningapp://LoggedOut");
+  } catch (error) {
+    console.error("Logout error:", error);
+    res.status(500).json({ message: "Failed to logout" });
   }
 };
 
@@ -366,6 +379,8 @@ export const beExpert = async (
     const userId = req.user?.id;
 
     const {
+      name,
+      university,
       profession,
       organization,
       location,
@@ -378,15 +393,16 @@ export const beExpert = async (
     } = req.body;
 
     const requiredFields = [
-      "profession",
-      "organization",
-      "location",
-      "description",
-      "experience",
-      "hourlyRate",
-      "skills",
-      "availableDays",
-      "availableTime",
+      // "name",
+      // "university",
+      // "profession",
+      // "organization",
+      // "location",
+      // "experience",
+      // "hourlyRate",
+      // "skills",
+      // "availableDays",
+      // "availableTime",
     ];
 
     const missingField = requiredFields.find((field) => !req.body[field]);
@@ -429,10 +445,12 @@ export const beExpert = async (
     const updatedUser = await prisma.users.update({
       where: { id: userId },
       data: {
+        name,
         activeProfile: "EXPERT",
         expertProfile: currentUser.expertProfile
           ? {
             update: {
+              university,
               profession,
               organization,
               location,

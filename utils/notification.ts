@@ -17,6 +17,10 @@ export const accept_booking = async (booking: BookingWithRelations) => {
         duration: booking.sessionDuration,
         agenda: JSON.stringify(booking.sessionDetails),
         timezone: booking?.expert?.timezone ?? "UTC",
+        expert_email: booking.expert.email,
+        tracking_fields: [
+            { field: "booking_id", value: booking.id },
+        ]
     });
 
     await prisma.notification.create({
@@ -165,6 +169,25 @@ export const index = (notifications: Notification[]) => {
                             url: `/payments/bookings/${booking_id}/refunds/${notification.id}/review`,
                             req_method: 'POST',
                             disabled: m.texts?.[0] === 'Confirmed' ? true : false
+                        }
+                    ]
+                }
+            case 'BOOKING_CANCELLED_BY_STUDENT':
+                // @ts-ignore
+                booking_id = notification.meta?.booking_id as string
+                const mm: any = notification?.meta
+                return {
+                    img: notification.image,
+                    title: notification.title,
+                    description: notification.message,
+                    actions: [
+                        {
+                            bg_primary: true,
+                            text: mm.texts?.[0],
+                            url: `/payments/refund/experts/reviews/${booking_id}/${notification.id}`,
+                            req_method: 'PATCH',
+                            disabled: mm.disabled
+                            // disabled: mm.texts?.[0] === 'Confirmed' ? true : false
                         }
                     ]
                 }

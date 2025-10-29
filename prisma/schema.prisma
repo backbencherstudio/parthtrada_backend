@@ -42,6 +42,7 @@ model StudentProfile {
 model ExpertProfile {
   id                 String              @id @default(cuid())
   profession         String?
+  university         String?
   organization       String?
   location           String?
   description        String?
@@ -67,6 +68,7 @@ model Booking {
   studentDateTime DateTime?
   meetingLink     String?
   meetingID       BigInt?       @unique
+  meeting_summery String?
   sessionDetails  Json
   sessionDuration Int
   status          BookingStatus @default(PENDING)

@@ -12,13 +12,13 @@ import { verifyUser } from '@/middleware/verifyUsers';
 const router = Router();
 
 // Student Routes
-router.post("/", verifyUser("STUDENT"), create);
-router.get("/", verifyUser("STUDENT"), index);
-router.patch("/cancel/:id", verifyUser("STUDENT"), cancelBooking);
-router.get("/past-call", verifyUser("STUDENT"), pastCallStudent)
-router.get("/request", verifyUser("STUDENT"), bookingRequest)
+router.post("/", verifyUser("ANY",), create);
+router.get("/", verifyUser("ANY"), index);
+router.patch("/cancel/:id", verifyUser("ANY"), cancelBooking);
+router.get("/past-call", verifyUser("ANY"), pastCallStudent)
+router.get("/request", verifyUser("ANY"), bookingRequest)
 
 // Expert Routes
-router.get('/schedule/expert', verifyUser('EXPERT'), expertIndex);
+router.get('/schedule/expert', verifyUser('ANY'), expertIndex);
 
 export default router;
